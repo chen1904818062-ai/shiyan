@@ -4,7 +4,9 @@
 
 ## 部署状态
 
-本地独立运行构建和功能验收已完成。真正的线上状态应以 Render 部署记录和 `/healthz` 返回值为准；仅生成配置文件不代表已经上线。
+本地独立运行构建和功能验收已完成，源码已推送至 [shiyan 私有仓库](https://github.com/chen1904818062-ai/shiyan)。已在 Turso 创建独立的 `shiyan-beta` libSQL 数据库，地区为 Tokyo（AWS `ap-northeast-1`）。数据库认证信息仅用于服务环境变量，不写入源码。
+
+Render 首次创建服务时返回仓库不可读取，需要在 GitHub 的 Render 应用授权中加入 `shiyan`。Codex 的 GitHub 连接权限与 Render 的仓库权限分别管理。当前还没有可交付的 Render 测试地址；真正的线上状态应以 Render 部署记录和 `/healthz` 返回值为准。
 
 ## 首次部署
 
