@@ -1,12 +1,16 @@
 # Render + Turso 海外测试版
 
-当前准备的部署目标：Render 的 `帅's workspace`，新加坡区域，独立的 `shiyan-beta` Web Service，源码仓库 `chen1904818062-ai/shiyan`。数据库使用为拾言新建的独立 Turso **libSQL** 数据库。新版本复用现有页面和业务接口，不依赖 Sites 登录或 Cloudflare D1。
+已部署目标：Render 的 `帅's workspace`，新加坡区域，独立的 `shiyan-beta` Web Service，源码仓库 `chen1904818062-ai/shiyan`。数据库使用为拾言新建的独立 Turso **libSQL** 数据库。新版本复用现有页面和业务接口，不依赖 Sites 登录或 Cloudflare D1。
 
 ## 部署状态
 
 本地独立运行构建和功能验收已完成，源码已推送至 [shiyan 私有仓库](https://github.com/chen1904818062-ai/shiyan)。已在 Turso 创建独立的 `shiyan-beta` libSQL 数据库，地区为 Tokyo（AWS `ap-northeast-1`）。数据库认证信息仅用于服务环境变量，不写入源码。
 
-Render 首次创建服务时返回仓库不可读取，需要在 GitHub 的 Render 应用授权中加入 `shiyan`。Codex 的 GitHub 连接权限与 Render 的仓库权限分别管理。当前还没有可交付的 Render 测试地址；真正的线上状态应以 Render 部署记录和 `/healthz` 返回值为准。
+2026-10-18 已完成海外测试部署：[打开拾言测试版](https://shiyan-beta.onrender.com)。[Render 服务控制台](https://dashboard.render.com/web/srv-dbadkqvbtjjs73eoft30)，服务 ID 为 `srv-dbadkqvbtjjs73eoft30`，首次部署 `dep-dbadkr7btjjs73eofupg` 已确认 `live`。
+
+线上已验证 `/healthz`、匿名访问拦截、密码登录与安全 Cookie、话题创建、原文完整保存、重复导入拦截、Turso 中的实际存储、退出登录以及无模型密钥时的提示。验收数据已删除。真实模型调用需配置 API Key 后再验收。
+
+登录密码在上述 Render 服务的 Environment 中查看 `APP_ACCESS_PASSWORD`，可以修改并重新部署。数据库令牌只保存在服务环境变量中；创建过程中更换过令牌，旧令牌已通过实际连接验证失效。Codex 的 GitHub 连接权限与 Render 的仓库权限分别管理，后续新增私有仓库时应分别授权。
 
 ## 首次部署
 
