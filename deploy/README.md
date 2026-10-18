@@ -1,0 +1,66 @@
+# Render + Turso 海外测试版
+
+当前准备的部署目标：Render 的 `帅's workspace`，新加坡区域，独立的 `shiyan-beta` Web Service，源码仓库 `chen1904818062-ai/shiyan`。数据库使用为拾言新建的独立 Turso **libSQL** 数据库。新版本复用现有页面和业务接口，不依赖 Sites 登录或 Cloudflare D1。
+
+## 部署状态
+
+本地独立运行构建和功能验收已完成。真正的线上状态应以 Render 部署记录和 `/healthz` 返回值为准；仅生成配置文件不代表已经上线。
+
+## 首次部署
+
+1. 确认 GitHub 连接有权访问 `shiyan` 私有仓库，并将本项目源码推送至该仓库。
+2. 在 [Turso 控制台](https://app.turso.tech/) 为拾言创建单独的 **libSQL** 测试数据库。选择与新加坡部署较接近的可用地区；不要复用或清空其他项目的数据库。当前适配器使用官方 `@libsql/client/web`，不使用 Turso 新引擎专属 SDK。
+3. 取得数据库的 `libsql://...` URL 和具备读写权限的数据库令牌。令牌仅填入 Render 的环境变量设置，不提交到仓库，不放入聊天。
+4. 在已确认的 Render 工作区，从本仓库创建 Docker Web Service，使用根目录 `Dockerfile`。代码内也提供了 `render.yaml`，可以通过 Blueprint 创建。
+5. 采用测试用 Free 实例，区域 Singapore；监听 `0.0.0.0:$PORT`，健康检查路径 `/healthz`。数据库保存在 Turso，不依赖 Render 的本地文件系统。
+6. 配置下表环境变量。启动时按历史记录执行数据库迁移，失败时不会开放私人空间。等 Render 的特定部署状态变为 `live`，并验证健康检查、登录和原文保存后，再把该 URL 作为可用测试版交付。
+
+| 环境变量 | 设置方法 |
+| --- | --- |
+| `TURSO_DATABASE_URL` | 新测试库的 `libsql://...` URL，必填 |
+| `TURSO_AUTH_TOKEN` | 该库的读写令牌，必填，保密 |
+| `APP_ACCESS_PASSWORD` | 至少16字符的测试访问密码，必填；Blueprint 会自动生成，可在 Render 环境变量中查看或修改 |
+| `APP_OWNER_ID` | 固定为 `shiyan-private-owner`，迁移时保留 |
+| `APP_DISPLAY_NAME` | 可选，私人空间中显示的名称 |
+| `APP_BASE_URL` | Render 通常无需填写，会读取自动提供的 `RENDER_EXTERNAL_URL`；其他平台须填公开 HTTPS 地址 |
+| `MODEL_API_KEY` 等 | 可选，仍可直接在网页模型设置中临时填写个人密钥 |
+
+Free 实例的休眠、配额和文件系统规则参考 [Render 官方说明](https://render.com/docs/free)。同一个工作区的免费实例共享月度运行额度；本配置没有升级为付费实例，也不修改已有 `tongpinlab` 服务。
+
+测试版以访问密码保护单个私人空间，使用服务端会话、HttpOnly Cookie 和登录频率限制。没有开放公开注册；不要把它当作已完成多用户权限体系的正式产品。
+
+原 Sites 版本和新 Turso 测试库相互独立。旧 D1 数据保留在原站点，不会自动搬到新库，也不会因这次部署而删除。
+
+## 本地验收
+
+```powershell
+npm ci
+npm run build:standalone
+node --test tests/standalone.test.mjs tests/summary.test.mjs tests/model-config.test.mjs
+```
+
+`tests/standalone.test.mjs` 仅使用临时本地 SQLite 文件，显式开启 `ALLOW_LOCAL_DB`；验证迁移重复执行、事务回滚、登录、伪造身份头拦截、原文持久化、进程重启和退出登录。它不能代替真实 Turso 连接验收。
+
+源码默认仍可构建原 Sites 版本，`npm run build` 和 `npm run build:standalone` 分别产生 `dist/` 和 `standalone-dist/`。模型功能共用同一份业务实现。
+
+## ICP 备案完成后的腾讯云迁移
+
+这部分是迁移配置和操作说明，不会提前创建腾讯云资源或自动切换域名。
+
+1. 在目标腾讯云服务器安装 Docker 与 Compose，部署同一份代码或镜像。
+2. 将 `deploy/standalone.env.example` 复制为服务器上的 `.env.standalone`，配置访问密码、数据库连接和正式 `APP_BASE_URL=https://你的域名`。该文件不进入版本控制。
+3. 首次迁移可继续连接同一个 Turso 库，并保持 `APP_OWNER_ID`，先验证应用迁移，再单独处理数据库迁移。
+4. 执行 `docker compose up -d --build`。服务只绑定本机 `127.0.0.1:17878`，由已有反向代理和 HTTPS 入口转发；不会默认占用其他项目的80或443端口。
+5. 如需将数据库也迁入腾讯云，先暂停写入并备份。`scripts/transfer-data.mjs` 可以导出话题、原文和报告，不导出登录会话和模型密钥。导入只接受空目标库，拒绝覆盖已有数据。
+
+```powershell
+# 在可信环境通过环境变量配置源 Turso 连接后导出
+node scripts/transfer-data.mjs export /absolute/path/shiyan-backup.json
+
+# 修改为目标数据库连接后导入；先确认目标为空
+node scripts/transfer-data.mjs import /absolute/path/shiyan-backup.json
+```
+
+个人小规模实例也可用持久卷中的 SQLite：设置 `ALLOW_LOCAL_DB=true`、`TURSO_DATABASE_URL=file:///data/shiyan.sqlite`，保留 Compose 的 `/data` 数据卷。此模式仅适用于单实例；多实例需要另行设计数据库与备份方案。原备份中记录的用户 ID 必须与 `APP_OWNER_ID` 一致，才能看到同一份数据。
+
+6. 验证健康检查、登录、话题数量、原文、总结引用和模型调用，确认后再切换正式域名。Render 回滚不等于数据库回滚，旧测试环境应在新环境验收后再处理。

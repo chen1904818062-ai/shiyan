@@ -1,0 +1,111 @@
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { openDatabase, migrate } from "./database.ts";
+import { setDatabase, requests } from "./server-context.ts";
+import { createAuth } from "./auth.ts";
+import { loginPage } from "./pages.ts";
+import { ApiError, json } from "../lib/http-common.ts";
+import * as topics from "../app/api/topics/route.ts";
+import * as topic from "../app/api/topics/[id]/route.ts";
+import * as conversations from "../app/api/topics/[id]/conversations/route.ts";
+import * as conversation from "../app/api/conversations/[id]/route.ts";
+import * as summarize from "../app/api/topics/[id]/summarize/route.ts";
+import * as model from "../app/api/model/route.ts";
+
+const directory = dirname(fileURLToPath(import.meta.url));
+const host = process.env.HOST || "0.0.0.0";
+const port = Number(process.env.PORT || 10000);
+const origin = new URL(process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || `http://127.0.0.1:${port}`);
+if (process.env.NODE_ENV === "production" && origin.protocol !== "https:") throw new Error("APP_BASE_URL or RENDER_EXTERNAL_URL must specify the public HTTPS origin");
+const { client, db } = openDatabase();
+await migrate(client, [join(directory, "migrations/app"), join(directory, "migrations/auth")]);
+setDatabase(db);
+const auth = await createAuth(db, process.env.APP_ACCESS_PASSWORD || "", origin);
+
+async function requestBody(request: IncomingMessage) {
+  const chunks: Buffer[] = []; let length = 0;
+  for await (const chunk of request) { length += chunk.length; if (length > 600_000) throw new ApiError("提交的内容过长，请分次添加。", 413); chunks.push(Buffer.from(chunk)); }
+  return Buffer.concat(chunks);
+}
+function html(content: string, status = 200) { return new Response(content, { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } }); }
+function redirect(location: string) { return new Response(null, { status: 303, headers: { Location: location, "Cache-Control": "no-store" } }); }
+
+async function route(request: Request, address: string): Promise<Response> {
+  const pathname = new URL(request.url).pathname;
+  if (request.method === "GET" && pathname === "/healthz") { await client.execute("SELECT 1"); return json({ status: "ok", application: "shiyan-beta" }); }
+  if (request.method === "GET" && (pathname === "/login" || pathname === "/signin-with-chatgpt")) return await auth.user(request) ? redirect("/") : html(loginPage());
+  if (pathname === "/login" && request.method === "POST") {
+    try { return await auth.login(request, address); }
+    catch (error) { if (error instanceof ApiError) return html(loginPage(error.message), error.status); throw error; }
+  }
+  if ((pathname === "/signout-with-chatgpt" || pathname === "/logout") && (request.method === "GET" || request.method === "POST")) return auth.logout(request);
+  // A fixed asset allowlist prevents traversal and never serves source or secrets.
+  const assets: Record<string, [string, string]> = {
+    "/assets/app.js": ["assets/app.js", "text/javascript; charset=utf-8"],
+    "/assets/app.css": ["assets/app.css", "text/css; charset=utf-8"],
+    "/favicon.svg": ["favicon.svg", "image/svg+xml"],
+  };
+  if (request.method === "GET" && Object.hasOwn(assets, pathname)) {
+    const [file, type] = assets[pathname];
+    return new Response(await readFile(join(directory, "public", file)), { headers: { "Content-Type": type, "Cache-Control": "public, max-age=300" } });
+  }
+  const user = await auth.user(request);
+  if (!user) return pathname.startsWith("/api/") ? json({ error: "请先登录后使用。" }, 401) : redirect("/login");
+  if (!["GET", "HEAD"].includes(request.method)) auth.sameOrigin(request);
+  return requests.run(user, async () => {
+    if (pathname === "/api/session" && request.method === "GET") return json({ displayName: process.env.APP_DISPLAY_NAME || "我的空间" });
+    if (pathname === "/" && request.method === "GET") return html(await readFile(join(directory, "public/index.html"), "utf8"));
+    if (pathname === "/api/model" && request.method === "GET") return model.GET();
+    if (pathname === "/api/topics" && request.method === "GET") return topics.GET();
+    if (pathname === "/api/topics" && request.method === "POST") return topics.POST(request);
+    let match = /^\/api\/topics\/([a-zA-Z0-9-]+)$/.exec(pathname);
+    if (match) {
+      const params = { params: Promise.resolve({ id: match[1] }) };
+      if (request.method === "GET") return topic.GET(request, params);
+      if (request.method === "DELETE") return topic.DELETE(request, params);
+    }
+    match = /^\/api\/topics\/([a-zA-Z0-9-]+)\/(conversations|summarize)$/.exec(pathname);
+    if (match && request.method === "POST") {
+      const params = { params: Promise.resolve({ id: match[1] }) };
+      return match[2] === "conversations" ? conversations.POST(request, params) : summarize.POST(request, params);
+    }
+    match = /^\/api\/conversations\/([a-zA-Z0-9-]+)$/.exec(pathname);
+    if (match && request.method === "DELETE") return conversation.DELETE(request, { params: Promise.resolve({ id: match[1] }) });
+    return json({ error: "没有找到这个页面。" }, 404);
+  });
+}
+
+async function respond(response: ServerResponse, result: Response) {
+  response.writeHead(result.status, {
+    ...Object.fromEntries(result.headers),
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  });
+  response.end(Buffer.from(await result.arrayBuffer()));
+}
+
+const server = createServer(async (incoming, outgoing) => {
+  try {
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(incoming.headers)) if (value) headers.set(name, Array.isArray(value) ? value.join(", ") : value);
+    const method = incoming.method || "GET";
+    const body = method === "GET" || method === "HEAD" ? undefined : await requestBody(incoming);
+    const request = new Request(new URL(incoming.url || "/", origin), { method, headers, ...(body ? { body } : {}) });
+    await respond(outgoing, await route(request, incoming.socket.remoteAddress || "unknown"));
+  } catch (error) {
+    await respond(outgoing, error instanceof ApiError ? json({ error: error.message }, error.status) : json({ error: "服务暂时不可用，请稍后重试。" }, 503));
+  }
+});
+server.requestTimeout = 120_000;
+server.headersTimeout = 15_000;
+server.listen(port, host, () => console.log(`Shiyan beta listening on ${host}:${port}`));
+let shuttingDown = false;
+for (const signal of ["SIGTERM", "SIGINT"] as const) process.on(signal, () => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  server.close(() => { client.close(); process.exit(0); });
+  setTimeout(() => { server.closeAllConnections(); client.close(); process.exit(0); }, 25_000).unref();
+});

@@ -1,0 +1,16 @@
+services:
+  shiyan:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:17878:10000"
+    env_file:
+      - .env.standalone
+    environment:
+      HOST: 0.0.0.0
+      PORT: 10000
+    volumes:
+      - shiyan_data:/data
+
+volumes:
+  shiyan_data:

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: shiyan-beta
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: APP_ACCESS_PASSWORD
+        generateValue: true
+      - key: APP_OWNER_ID
+        value: shiyan-private-owner
