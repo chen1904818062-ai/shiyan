@@ -7,7 +7,7 @@ function derive(password: string, salt: Buffer) {
 export const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
 export async function createAuth(db: D1Database, password: string, origin: URL) {
-  if (password.length < 16) throw new Error("APP_ACCESS_PASSWORD must contain at least 16 characters");
+  if (password.length < 16 && process.env.APP_PUBLIC_SIGNUP !== "true") throw new Error("APP_ACCESS_PASSWORD must contain at least 16 characters");
   const salt = randomBytes(32);
   const verifier = await derive(password, salt);
   const secure = origin.protocol === "https:";
@@ -28,6 +28,9 @@ export async function createAuth(db: D1Database, password: string, origin: URL) 
 
   async function login(request: Request, address: string) {
     sameOrigin(request);
+    if (password.length < 16) throw new ApiError("原空间密码登录未开放，请使用验证码登录。", 403);
+    const linked = await db.prepare("SELECT user_id FROM shiyan_identities WHERE user_id = ? LIMIT 1").bind(ownerId).first();
+    if (process.env.APP_PUBLIC_SIGNUP === "true" && linked) throw new ApiError("原空间已绑定账号，请使用手机或邮箱验证码登录。", 403);
     if (!request.headers.get("content-type")?.startsWith("application/x-www-form-urlencoded")) throw new ApiError("登录请求格式不正确。", 415);
     const sourceHash = sha256(address);
     const now = Date.now();

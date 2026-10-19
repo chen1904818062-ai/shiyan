@@ -6,6 +6,7 @@ const root = process.cwd();
 const output = path.join(root, "standalone-dist");
 await mkdir(path.join(output, "public/assets"), { recursive: true });
 await Promise.all([
+  build({ absWorkingDir: root, entryPoints: [path.join(root, "standalone/auth-client.tsx")], outfile: path.join(output, "public/assets/auth.js"), bundle: true, minify: true, format: "esm", platform: "browser", target: "es2022", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' } }),
   build({ absWorkingDir: root, entryPoints: [path.join(root, "standalone/client.tsx")], outfile: path.join(output, "public/assets/app.js"), bundle: true, minify: true, format: "esm", platform: "browser", target: "es2022", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' }, plugins: [{ name: "plain-application-css", setup(api) { api.onLoad({ filter: /app[\\/]globals\.css$/ }, async args => ({ contents: (await readFile(args.path, "utf8")).replace(/^@import\s+["']tailwindcss["'];\s*/, ""), loader: "css" })); } }] }),
   build({ absWorkingDir: root, entryPoints: [path.join(root, "standalone/server.ts")], outfile: path.join(output, "server.mjs"), bundle: true, minify: true, format: "esm", platform: "node", target: "node24", alias: { "@/lib/server": path.join(root, "standalone/server-context.ts") }, banner: { js: 'import { createRequire as __createRequire } from "node:module"; const require = __createRequire(import.meta.url);' } }),
 ]);

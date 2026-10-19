@@ -22,7 +22,7 @@ test("SQL adapter preserves atomic batches, changes counts and migration history
       insert,
     ]));
     assert.equal(await db.prepare("SELECT id FROM topics WHERE id = ?").bind("two").first(), null);
-    assert.equal((await db.prepare("SELECT name FROM shiyan_migrations").all()).results.length, 2);
+    assert.equal((await db.prepare("SELECT name FROM shiyan_migrations").all()).results.length, 3);
   } finally { client.close(); }
 });
 
@@ -50,7 +50,7 @@ test("standalone server protects private data, persists originals and survives r
   try {
     const health = await fetch(base + "/healthz");
     assert.equal(health.status, 200);
-    assert.deepEqual(await health.json(), { status: "ok", application: "shiyan", version: "1.0.0" });
+    assert.deepEqual(await health.json(), { status: "ok", application: "shiyan", version: "1.1.0" });
     assert.equal((await fetch(base + "/api/topics")).status, 401);
     assert.equal((await fetch(base + "/api/topics", { headers: { "oai-authenticated-user-id": "shiyan-private-owner", "oai-authenticated-user-email": "fake@test.invalid" } })).status, 401);
     assert.equal((await fetch(base + "/", { redirect: "manual" })).headers.get("location"), "/login");
@@ -88,6 +88,10 @@ test("standalone server protects private data, persists originals and survives r
 test("migration backup restores into an empty database and refuses overwriting existing data", async () => {
   const backup = join(directory, "backup.json");
   const sourceEnv = { ...process.env, ALLOW_LOCAL_DB: "true", TURSO_DATABASE_URL: pathToFileURL(join(directory, "adapter.sqlite")).href };
+  const source = openDatabase(sourceEnv);
+  await source.db.prepare("INSERT INTO shiyan_users (id, display_name, created_at) VALUES (?, ?, ?)").bind("owner", "测试空间", 123).run();
+  await source.db.prepare("INSERT INTO shiyan_identities (channel, address, user_id, verified_at) VALUES (?, ?, ?, ?)").bind("email", "backup@example.com", "owner", 123).run();
+  source.client.close();
   const exported = spawnSync(process.execPath, ["scripts/transfer-data.mjs", "export", backup], { env: sourceEnv, encoding: "utf8" });
   assert.equal(exported.status, 0, exported.stderr);
   const targetEnv = { ...sourceEnv, TURSO_DATABASE_URL: pathToFileURL(join(directory, "restored.sqlite")).href };
@@ -95,6 +99,9 @@ test("migration backup restores into an empty database and refuses overwriting e
   assert.equal(imported.status, 0, imported.stderr);
   const { db, client } = openDatabase(targetEnv);
   assert.equal((await db.prepare("SELECT title FROM topics WHERE id = ?").bind("one").first()).title, "话题");
+  assert.equal((await db.prepare("SELECT user_id FROM shiyan_identities WHERE address = ?").bind("backup@example.com").first()).user_id, "owner");
+  assert.equal((await db.prepare("SELECT created_at FROM shiyan_users WHERE id = ?").bind("owner").first()).created_at, 123);
+  assert.equal((await db.prepare("SELECT COUNT(*) AS count FROM shiyan_sessions").first()).count, 0);
   client.close();
   const rejected = spawnSync(process.execPath, ["scripts/transfer-data.mjs", "import", backup], { env: targetEnv, encoding: "utf8" });
   assert.notEqual(rejected.status, 0);

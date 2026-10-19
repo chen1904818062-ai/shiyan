@@ -7,8 +7,8 @@ async function start() {
     const response = await fetch("/api/session", { cache: "no-store" });
     if (response.status === 401) { window.location.replace("/login"); return; }
     if (!response.ok) throw new Error();
-    const user = await response.json() as { displayName: string };
-    createRoot(document.getElementById("root")!).render(<Workspace displayName={user.displayName} />);
+    const user = await response.json() as { displayName: string; accountEnabled?: boolean };
+    createRoot(document.getElementById("root")!).render(<Workspace displayName={user.displayName} accountEnabled={user.accountEnabled} />);
   } catch {
     const node = document.getElementById("root")!;
     node.textContent = "暂时无法打开私人空间，请刷新页面重试。";

@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { openDatabase, migrate } from "./database.ts";
 import { setDatabase, requests } from "./server-context.ts";
 import { createAuth } from "./auth.ts";
-import { loginPage } from "./pages.ts";
+import { loginPage, accountPage } from "./pages.ts";
+import { createAccounts } from "./accounts.ts";
 import { ApiError, json } from "../lib/http-common.ts";
 import * as topics from "../app/api/topics/route.ts";
 import * as topic from "../app/api/topics/[id]/route.ts";
@@ -25,6 +26,13 @@ const { client, db } = openDatabase();
 await migrate(client, [join(directory, "migrations/app"), join(directory, "migrations/auth")]);
 setDatabase(db);
 const auth = await createAuth(db, process.env.APP_ACCESS_PASSWORD || "", origin);
+const accounts = createAccounts(db, origin);
+function accountHTML(request: Request, account = false) {
+  const response = html(accountPage(account));
+  const cookie = accounts.bindingCookie(request);
+  if (cookie) response.headers.set("Set-Cookie", cookie);
+  return response;
+}
 
 async function requestBody(request: IncomingMessage) {
   const chunks: Buffer[] = []; let length = 0;
@@ -37,16 +45,27 @@ function redirect(location: string) { return new Response(null, { status: 303, h
 async function route(request: Request, address: string): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   if (request.method === "GET" && pathname === "/healthz") { await client.execute("SELECT 1"); return json({ status: "ok", application: "shiyan", version: APP_VERSION }); }
-  if (request.method === "GET" && (pathname === "/login" || pathname === "/signin-with-chatgpt")) return await auth.user(request) ? redirect("/") : html(loginPage());
-  if (pathname === "/login" && request.method === "POST") {
+  if (request.method === "GET" && ["/login", "/register", "/signin-with-chatgpt"].includes(pathname)) return await auth.user(request) ? redirect("/") : accounts.enabled ? accountHTML(request) : html(loginPage());
+  if (request.method === "GET" && pathname === "/owner/login") return await auth.user(request) ? redirect("/account") : html(loginPage("", "/owner/login"));
+  if ((pathname === "/login" || pathname === "/owner/login") && request.method === "POST") {
+    if (accounts.enabled && pathname === "/login") throw new ApiError("请使用验证码登录。", 403);
     try { return await auth.login(request, address); }
-    catch (error) { if (error instanceof ApiError) return html(loginPage(error.message), error.status); throw error; }
+    catch (error) { if (error instanceof ApiError) return html(loginPage(error.message, pathname), error.status); throw error; }
   }
+  if (pathname === "/api/auth/config" && request.method === "GET") {
+    const response = json({ channels: accounts.channels() });
+    const cookie = accounts.bindingCookie(request);
+    if (cookie) response.headers.set("Set-Cookie", cookie);
+    return response;
+  }
+  if (pathname === "/api/auth/send" && request.method === "POST") return accounts.send(request, address, null);
+  if (pathname === "/api/auth/verify" && request.method === "POST") return accounts.verify(request, address, null);
   if ((pathname === "/signout-with-chatgpt" || pathname === "/logout") && (request.method === "GET" || request.method === "POST")) return auth.logout(request);
   // A fixed asset allowlist prevents traversal and never serves source or secrets.
   const assets: Record<string, [string, string]> = {
     "/assets/app.js": ["assets/app.js", "text/javascript; charset=utf-8"],
     "/assets/app.css": ["assets/app.css", "text/css; charset=utf-8"],
+    "/assets/auth.js": ["assets/auth.js", "text/javascript; charset=utf-8"],
     "/favicon.svg": ["favicon.svg", "image/svg+xml"],
   };
   if (request.method === "GET" && Object.hasOwn(assets, pathname)) {
@@ -57,7 +76,15 @@ async function route(request: Request, address: string): Promise<Response> {
   if (!user) return pathname.startsWith("/api/") ? json({ error: "请先登录后使用。" }, 401) : redirect("/login");
   if (!["GET", "HEAD"].includes(request.method)) auth.sameOrigin(request);
   return requests.run(user, async () => {
-    if (pathname === "/api/session" && request.method === "GET") return json({ displayName: process.env.APP_DISPLAY_NAME || "我的空间" });
+    if (pathname === "/api/session" && request.method === "GET") return json({ displayName: user.ownerId === (process.env.APP_OWNER_ID || "shiyan-private-owner") ? process.env.APP_DISPLAY_NAME || "我的空间" : "我的空间", accountEnabled: true });
+    if (pathname === "/account" && request.method === "GET") return accountHTML(request, true);
+    if (pathname === "/api/account/config" && request.method === "GET") {
+      const owner = user.ownerId === (process.env.APP_OWNER_ID || "shiyan-private-owner");
+      const fields = ["APP_AUTH_SECRET", "RESEND_API_KEY", "AUTH_EMAIL_FROM", "TENCENT_SMS_SECRET_ID", "TENCENT_SMS_SECRET_KEY", "TENCENT_SMS_APP_ID", "TENCENT_SMS_SIGN_NAME", "TENCENT_SMS_TEMPLATE_ID"];
+      return json({ ...(await accounts.profile(user.ownerId)), channels: accounts.channels(owner), owner, ...(owner ? { publicEnabled: accounts.enabled, setup: fields.map(name => ({ name, configured: name === "APP_AUTH_SECRET" ? (process.env[name]?.length || 0) >= 32 : !!process.env[name]?.trim() })) } : {}) });
+    }
+    if (pathname === "/api/account/send" && request.method === "POST") return accounts.send(request, address, user.ownerId);
+    if (pathname === "/api/account/verify" && request.method === "POST") return accounts.verify(request, address, user.ownerId);
     if (pathname === "/" && request.method === "GET") return html(await readFile(join(directory, "public/index.html"), "utf8"));
     if (pathname === "/api/model" && request.method === "GET") return model.GET();
     if (pathname === "/api/model/models" && request.method === "POST") return modelCatalog.POST(request);
@@ -99,7 +126,7 @@ const server = createServer(async (incoming, outgoing) => {
     const request = new Request(new URL(incoming.url || "/", origin), { method, headers, ...(body ? { body } : {}) });
     await respond(outgoing, await route(request, incoming.socket.remoteAddress || "unknown"));
   } catch (error) {
-    await respond(outgoing, error instanceof ApiError ? json({ error: error.message }, error.status) : json({ error: "服务暂时不可用，请稍后重试。" }, 503));
+    await respond(outgoing, error instanceof ApiError ? json({ error: error.message }, error.status) : error instanceof SyntaxError ? json({ error: "提交的内容格式不正确。" }, 400) : json({ error: "服务暂时不可用，请稍后重试。" }, 503));
   }
 });
 server.requestTimeout = 180_000;

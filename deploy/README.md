@@ -2,6 +2,10 @@
 
 已部署目标：Render 的 `帅's workspace`，新加坡区域，独立的 `shiyan-beta` Web Service，源码仓库 `chen1904818062-ai/shiyan`。数据库使用为拾言新建的独立 Turso **libSQL** 数据库。新版本复用现有页面和业务接口，不依赖 Sites 登录或 Cloudflare D1。
 
+## 多人账号版本 v1.1.0
+
+新增 Resend 邮箱验证码、腾讯云 +86 手机验证码、独立账号、手机与邮箱绑定及账号数据隔离。发送凭证尚未填写，公开入口保持关闭，原密码空间继续可用。配置及原空间绑定步骤见 [账号接入说明](ACCOUNT_SETUP.md)。自动验收使用模拟发送，真实收码需配置后再验证。
+
 ## 个人正式版发布
 
 2026-10-19 按现有 Render + Turso 服务发布 v1.0.0。沿用当前访问地址和私人空间，以 /healthz 中的 version 与 Render 特定部署状态确认实际运行版本。发布范围见 [版本说明](../CHANGELOG.md)。当前实例规格沿用 Free，未变更付费配置。
@@ -39,7 +43,7 @@
 
 Free 实例的休眠、配额和文件系统规则参考 [Render 官方说明](https://render.com/docs/free)。同一个工作区的免费实例共享月度运行额度；本配置没有升级为付费实例，也不修改已有 `tongpinlab` 服务。
 
-测试版以访问密码保护单个私人空间，使用服务端会话、HttpOnly Cookie 和登录频率限制。没有开放公开注册；不要把它当作已完成多用户权限体系的正式产品。
+公开登录关闭时仍以原访问密码保护个人空间；多人功能需按上述接入说明配置并启用，才开放给其他用户。
 
 原 Sites 版本和新 Turso 测试库相互独立。旧 D1 数据保留在原站点，不会自动搬到新库，也不会因这次部署而删除。
 
@@ -63,7 +67,7 @@ node --test tests/standalone.test.mjs tests/summary.test.mjs tests/model-config.
 2. 将 `deploy/standalone.env.example` 复制为服务器上的 `.env.standalone`，配置访问密码、数据库连接和正式 `APP_BASE_URL=https://你的域名`。该文件不进入版本控制。
 3. 首次迁移可继续连接同一个 Turso 库，并保持 `APP_OWNER_ID`，先验证应用迁移，再单独处理数据库迁移。
 4. 执行 `docker compose up -d --build`。服务只绑定本机 `127.0.0.1:17878`，由已有反向代理和 HTTPS 入口转发；不会默认占用其他项目的80或443端口。
-5. 如需将数据库也迁入腾讯云，先暂停写入并备份。`scripts/transfer-data.mjs` 可以导出话题、原文和报告，不导出登录会话和模型密钥。导入只接受空目标库，拒绝覆盖已有数据。
+5. 如需将数据库也迁入腾讯云，先暂停写入并备份。`scripts/transfer-data.mjs` v2 导出账号、已验证登录地址、话题、原文和报告，不导出会话、验证码和服务密钥。导入只接受空目标库；还原后重新配置发送服务和 APP_AUTH_SECRET。
 
 ```powershell
 # 在可信环境通过环境变量配置源 Turso 连接后导出
@@ -73,6 +77,6 @@ node scripts/transfer-data.mjs export /absolute/path/shiyan-backup.json
 node scripts/transfer-data.mjs import /absolute/path/shiyan-backup.json
 ```
 
-个人小规模实例也可用持久卷中的 SQLite：设置 `ALLOW_LOCAL_DB=true`、`TURSO_DATABASE_URL=file:///data/shiyan.sqlite`，保留 Compose 的 `/data` 数据卷。此模式仅适用于单实例；多实例需要另行设计数据库与备份方案。原备份中记录的用户 ID 必须与 `APP_OWNER_ID` 一致，才能看到同一份数据。
+小规模单实例也可用持久卷中的 SQLite：设置 `ALLOW_LOCAL_DB=true`、`TURSO_DATABASE_URL=file:///data/shiyan.sqlite`，保留 Compose 的 `/data` 数据卷。多实例须使用适合的共享数据库方案。迁移时保留账号 ID 及归属映射，原空间还需保留 `APP_OWNER_ID`。
 
 6. 验证健康检查、登录、话题数量、原文、总结引用和模型调用，确认后再切换正式域名。Render 回滚不等于数据库回滚，旧测试环境应在新环境验收后再处理。

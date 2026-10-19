@@ -6,7 +6,10 @@ export const requests = new AsyncLocalStorage<{ ownerId: string }>();
 let database: D1Database;
 export function setDatabase(db: D1Database) { database = db; }
 export function runtime() {
-  return { DB: database, MODEL_API_KEY: process.env.MODEL_API_KEY, MODEL_PROVIDER: process.env.MODEL_PROVIDER, MODEL_BASE_URL: process.env.MODEL_BASE_URL, MODEL_NAME: process.env.MODEL_NAME };
+  // Public users supply their own browser-memory keys. A server key belongs only
+  // to the original owner and must never fund other users' requests.
+  const owner = requests.getStore()?.ownerId === (process.env.APP_OWNER_ID || "shiyan-private-owner");
+  return { DB: database, MODEL_API_KEY: owner ? process.env.MODEL_API_KEY : undefined, MODEL_PROVIDER: process.env.MODEL_PROVIDER, MODEL_BASE_URL: process.env.MODEL_BASE_URL, MODEL_NAME: process.env.MODEL_NAME };
 }
 export async function context() {
   const user = requests.getStore();
