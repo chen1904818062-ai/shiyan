@@ -14,5 +14,5 @@ for (const [source, destination] of [["drizzle", "migrations/app"], ["standalone
   for (const file of await readdir(source)) if (file.endsWith(".sql")) await copyFile(path.join(source, file), path.join(output, destination, file));
 }
 await copyFile("public/favicon.svg", path.join(output, "public/favicon.svg"));
-await writeFile(path.join(output, "public/index.html"), '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>拾言 · 海外测试版</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/assets/app.css"></head><body><div id="root"><p style="padding:48px;color:#718363">正在打开你的思考空间…</p></div><script type="module" src="/assets/app.js"></script></body></html>');
+await writeFile(path.join(output, "public/index.html"), '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>拾言 · 对话整理</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/assets/app.css"></head><body><div id="root"><p style="padding:48px;color:#718363">正在打开你的思考空间…</p></div><script type="module" src="/assets/app.js"></script></body></html>');
 console.log("Standalone build ready: standalone-dist/server.mjs");

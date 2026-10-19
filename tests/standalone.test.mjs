@@ -48,7 +48,9 @@ test("standalone server protects private data, persists originals and survives r
   }
   await start();
   try {
-    assert.equal((await fetch(base + "/healthz")).status, 200);
+    const health = await fetch(base + "/healthz");
+    assert.equal(health.status, 200);
+    assert.deepEqual(await health.json(), { status: "ok", application: "shiyan", version: "1.0.0" });
     assert.equal((await fetch(base + "/api/topics")).status, 401);
     assert.equal((await fetch(base + "/api/topics", { headers: { "oai-authenticated-user-id": "shiyan-private-owner", "oai-authenticated-user-email": "fake@test.invalid" } })).status, 401);
     assert.equal((await fetch(base + "/", { redirect: "manual" })).headers.get("location"), "/login");

@@ -14,6 +14,7 @@ import * as conversation from "../app/api/conversations/[id]/route.ts";
 import * as summarize from "../app/api/topics/[id]/summarize/route.ts";
 import * as model from "../app/api/model/route.ts";
 import * as modelCatalog from "../app/api/model/models/route.ts";
+import { APP_VERSION } from "../lib/version.ts";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const host = process.env.HOST || "0.0.0.0";
@@ -35,7 +36,7 @@ function redirect(location: string) { return new Response(null, { status: 303, h
 
 async function route(request: Request, address: string): Promise<Response> {
   const pathname = new URL(request.url).pathname;
-  if (request.method === "GET" && pathname === "/healthz") { await client.execute("SELECT 1"); return json({ status: "ok", application: "shiyan-beta" }); }
+  if (request.method === "GET" && pathname === "/healthz") { await client.execute("SELECT 1"); return json({ status: "ok", application: "shiyan", version: APP_VERSION }); }
   if (request.method === "GET" && (pathname === "/login" || pathname === "/signin-with-chatgpt")) return await auth.user(request) ? redirect("/") : html(loginPage());
   if (pathname === "/login" && request.method === "POST") {
     try { return await auth.login(request, address); }
@@ -103,7 +104,7 @@ const server = createServer(async (incoming, outgoing) => {
 });
 server.requestTimeout = 180_000;
 server.headersTimeout = 15_000;
-server.listen(port, host, () => console.log(`Shiyan beta listening on ${host}:${port}`));
+server.listen(port, host, () => console.log(`Shiyan ${APP_VERSION} listening on ${host}:${port}`));
 let shuttingDown = false;
 for (const signal of ["SIGTERM", "SIGINT"] as const) process.on(signal, () => {
   if (shuttingDown) return;

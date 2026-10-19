@@ -1,8 +1,12 @@
-# Render + Turso 海外测试版
+# Render + Turso 部署
 
 已部署目标：Render 的 `帅's workspace`，新加坡区域，独立的 `shiyan-beta` Web Service，源码仓库 `chen1904818062-ai/shiyan`。数据库使用为拾言新建的独立 Turso **libSQL** 数据库。新版本复用现有页面和业务接口，不依赖 Sites 登录或 Cloudflare D1。
 
-## 部署状态
+## 个人正式版发布
+
+2026-10-19 按现有 Render + Turso 服务发布 v1.0.0。沿用当前访问地址和私人空间，以 /healthz 中的 version 与 Render 特定部署状态确认实际运行版本。发布范围见 [版本说明](../CHANGELOG.md)。当前实例规格沿用 Free，未变更付费配置。
+
+## 初次部署记录
 
 本地独立运行构建和功能验收已完成，源码已推送至 [shiyan 私有仓库](https://github.com/chen1904818062-ai/shiyan)。已在 Turso 创建独立的 `shiyan-beta` libSQL 数据库，地区为 Tokyo（AWS `ap-northeast-1`）。数据库认证信息仅用于服务环境变量，不写入源码。
 

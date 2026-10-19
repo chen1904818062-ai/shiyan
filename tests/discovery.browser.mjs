@@ -16,7 +16,7 @@ try {
   browser=await chromium.launch({headless:true,...(process.env.TEST_BROWSER_PATH?{executablePath:process.env.TEST_BROWSER_PATH}:{})});
   const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});const page=await context.newPage();const errors=[];page.on('pageerror',error=>errors.push(error.message));
   assert.equal((await context.request.post(base+'/api/model/models',{data:{provider:'glm',apiKey:'test-many'}})).status(),401);
-  await page.goto(base+'/login');await page.getByLabel('测试访问密码',{exact:true}).fill(password);await page.getByRole('button',{name:'进入私人空间'}).click();
+  await page.goto(base+'/login');await page.getByLabel('访问密码',{exact:true}).fill(password);await page.getByRole('button',{name:'进入私人空间'}).click();
   const topic=await (await context.request.post(base+'/api/topics',{data:{title:'详细整理验收'}})).json();const topicId=topic.topic.id;
   await context.request.post(`${base}/api/topics/${topicId}/conversations`,{data:{title:'虚构简历素材',source:'豆包',content:'用户：我决定先核实活动记录。\nAI：列出两段校园活动，核实数据再按背景、任务、行动、结果组织，并对照岗位要求。例子：协调3个社团完成现场签到。没有可靠数字时写具体产出，不编造数据。'}});
   await page.reload();await page.getByRole('heading',{name:'详细整理验收',exact:true}).click();
