@@ -7,6 +7,7 @@ import { setDatabase, requests } from "./server-context.ts";
 import { createAuth } from "./auth.ts";
 import { loginPage, accountPage } from "./pages.ts";
 import { createAccounts } from "./accounts.ts";
+import { assetEncoding } from "./assets.ts";
 import { ApiError, json } from "../lib/http-common.ts";
 import * as topics from "../app/api/topics/route.ts";
 import * as topic from "../app/api/topics/[id]/route.ts";
@@ -27,11 +28,16 @@ await migrate(client, [join(directory, "migrations/app"), join(directory, "migra
 setDatabase(db);
 const auth = await createAuth(db, process.env.APP_ACCESS_PASSWORD || "", origin);
 const accounts = createAccounts(db, origin);
-function accountHTML(request: Request, account = false) {
-  const response = html(accountPage(account));
+function accountHTML(request: Request, account = false, config = { channels: accounts.channels() }) {
+  const response = html(accountPage(account, config));
   const cookie = accounts.bindingCookie(request);
   if (cookie) response.headers.set("Set-Cookie", cookie);
   return response;
+}
+async function accountConfig(ownerId: string) {
+  const owner = ownerId === (process.env.APP_OWNER_ID || "shiyan-private-owner");
+  const fields = ["APP_AUTH_SECRET", "RESEND_API_KEY", "AUTH_EMAIL_FROM", "TENCENT_SMS_SECRET_ID", "TENCENT_SMS_SECRET_KEY", "TENCENT_SMS_APP_ID", "TENCENT_SMS_SIGN_NAME", "TENCENT_SMS_TEMPLATE_ID"];
+  return { ...(await accounts.profile(ownerId)), channels: accounts.channels(owner), owner, ...(owner ? { publicEnabled: accounts.enabled, setup: fields.map(name => ({ name, configured: name === "APP_AUTH_SECRET" ? (process.env[name]?.length || 0) >= 32 : !!process.env[name]?.trim() })) } : {}) };
 }
 
 async function requestBody(request: IncomingMessage) {
@@ -66,22 +72,23 @@ async function route(request: Request, address: string): Promise<Response> {
     "/assets/app.js": ["assets/app.js", "text/javascript; charset=utf-8"],
     "/assets/app.css": ["assets/app.css", "text/css; charset=utf-8"],
     "/assets/auth.js": ["assets/auth.js", "text/javascript; charset=utf-8"],
+    "/assets/auth.css": ["assets/auth.css", "text/css; charset=utf-8"],
     "/favicon.svg": ["favicon.svg", "image/svg+xml"],
   };
   if (request.method === "GET" && Object.hasOwn(assets, pathname)) {
     const [file, type] = assets[pathname];
-    return new Response(await readFile(join(directory, "public", file)), { headers: { "Content-Type": type, "Cache-Control": "public, max-age=300" } });
+    const encoding = /\.(js|css)$/.test(file) ? assetEncoding(request.headers.get("accept-encoding") || "") : undefined;
+    const content = await readFile(join(directory, "public", file + (encoding === "br" ? ".br" : encoding === "gzip" ? ".gz" : "")));
+    return new Response(content, { headers: { "Content-Type": type, "Cache-Control": "public, max-age=300", Vary: "Accept-Encoding", "Content-Length": String(content.byteLength), ...(encoding ? { "Content-Encoding": encoding } : {}) } });
   }
   const user = await auth.user(request);
   if (!user) return pathname.startsWith("/api/") ? json({ error: "请先登录后使用。" }, 401) : redirect("/login");
   if (!["GET", "HEAD"].includes(request.method)) auth.sameOrigin(request);
   return requests.run(user, async () => {
     if (pathname === "/api/session" && request.method === "GET") return json({ displayName: user.ownerId === (process.env.APP_OWNER_ID || "shiyan-private-owner") ? process.env.APP_DISPLAY_NAME || "我的空间" : "我的空间", accountEnabled: true });
-    if (pathname === "/account" && request.method === "GET") return accountHTML(request, true);
+    if (pathname === "/account" && request.method === "GET") return accountHTML(request, true, await accountConfig(user.ownerId));
     if (pathname === "/api/account/config" && request.method === "GET") {
-      const owner = user.ownerId === (process.env.APP_OWNER_ID || "shiyan-private-owner");
-      const fields = ["APP_AUTH_SECRET", "RESEND_API_KEY", "AUTH_EMAIL_FROM", "TENCENT_SMS_SECRET_ID", "TENCENT_SMS_SECRET_KEY", "TENCENT_SMS_APP_ID", "TENCENT_SMS_SIGN_NAME", "TENCENT_SMS_TEMPLATE_ID"];
-      return json({ ...(await accounts.profile(user.ownerId)), channels: accounts.channels(owner), owner, ...(owner ? { publicEnabled: accounts.enabled, setup: fields.map(name => ({ name, configured: name === "APP_AUTH_SECRET" ? (process.env[name]?.length || 0) >= 32 : !!process.env[name]?.trim() })) } : {}) });
+      return json(await accountConfig(user.ownerId));
     }
     if (pathname === "/api/account/send" && request.method === "POST") return accounts.send(request, address, user.ownerId);
     if (pathname === "/api/account/verify" && request.method === "POST") return accounts.verify(request, address, user.ownerId);
