@@ -6,6 +6,8 @@
 
 2026-10-19 按现有 Render + Turso 服务发布 v1.0.0。沿用当前访问地址和私人空间，以 /healthz 中的 version 与 Render 特定部署状态确认实际运行版本。发布范围见 [版本说明](../CHANGELOG.md)。当前实例规格沿用 Free，未变更付费配置。
 
+正式版部署 `dep-dbaq4e3m8hqs73bm2bug` 已确认 live，线上健康接口返回 version=1.0.0。随后完成 GLM 真实验收：平台目录返回11个型号，选择 glm-5.3-flash 后，接口返回同一型号；详细报告及调用记录已保存，可在「正式版验收（虚构资料）」查看。
+
 ## 初次部署记录
 
 本地独立运行构建和功能验收已完成，源码已推送至 [shiyan 私有仓库](https://github.com/chen1904818062-ai/shiyan)。已在 Turso 创建独立的 `shiyan-beta` libSQL 数据库，地区为 Tokyo（AWS `ap-northeast-1`）。数据库认证信息仅用于服务环境变量，不写入源码。
