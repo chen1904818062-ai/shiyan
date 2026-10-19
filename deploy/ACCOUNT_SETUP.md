@@ -4,6 +4,8 @@
 
 现有 Render 服务的 Environment 是配置来源。以下只配置拾言服务，密钥不进入代码、聊天或前端。
 
+当前拾言线上服务已生成并保存 `APP_AUTH_SECRET`，并设置 `APP_PUBLIC_SIGNUP=false`。你只需先补充 `RESEND_API_KEY` 和 `AUTH_EMAIL_FROM`，保留已有系统密钥即可。下表中的系统密钥说明供重新部署到其他服务器时使用。
+
 ## Resend 邮箱
 
 在 [拾言 Render 环境设置](https://dashboard.render.com/web/srv-dbadkqvbtjjs73eoft30/env) 填写：
