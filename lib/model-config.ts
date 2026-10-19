@@ -20,7 +20,8 @@ export function resolveModelConfig(input: ModelInput, server: ServerModelConfig)
   if (suppliedKey) {
     const provider = input.provider ?? "deepseek";
     if (!isProviderId(provider)) throw new ModelConfigurationError("请选择支持的模型提供商。", 400);
-    return { apiKey: suppliedKey, provider, baseURL: providers[provider].baseURL, model: input.model?.trim() || providers[provider].models[0] };
+    if (!input.model?.trim()) throw new ModelConfigurationError("请先读取模型列表并选择型号，再生成总结。", 422);
+    return { apiKey: suppliedKey, provider, baseURL: providers[provider].baseURL, model: input.model.trim() };
   }
   // An explicitly selected provider must not borrow another provider's server key.
   if (input.provider !== undefined || input.apiKey !== undefined || !server.MODEL_API_KEY?.trim()) {
@@ -41,6 +42,7 @@ export function buildModelRequest(config: ResolvedModel, system: string, input: 
   let extras: Record<string, unknown> = {};
   if (config.provider === "deepseek") extras = { thinking: { type: "disabled" }, temperature: 0.2 };
   else if (config.provider === "glm" && /^glm-4\./.test(config.model)) extras = { thinking: { type: "disabled" }, temperature: 0.2 };
+  else if (config.provider === "glm" && /^glm-5\.3-flashx?$/.test(config.model)) extras = { thinking: { type: "enabled" }, reasoning_effort: "low" };
   else if (config.provider === "qwen") extras = { enable_thinking: false };
   else if (config.provider === "kimi" && /^kimi-k2\.[56]$/.test(config.model)) extras = { thinking: { type: "disabled" } };
   else if (config.provider === "kimi" && config.model.startsWith("kimi-k3")) extras = { reasoning_effort: "low" };
@@ -49,7 +51,7 @@ export function buildModelRequest(config: ResolvedModel, system: string, input: 
     init: {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
-      body: JSON.stringify({ model: config.model, messages: [{ role: "system", content: system }, { role: "user", content: input }], response_format: { type: "json_object" }, max_tokens: 3500, ...extras, stream: false }),
+      body: JSON.stringify({ model: config.model, messages: [{ role: "system", content: system }, { role: "user", content: input }], response_format: { type: "json_object" }, max_tokens: 12000, ...extras, stream: false }),
       redirect: "error" as const,
     },
   };

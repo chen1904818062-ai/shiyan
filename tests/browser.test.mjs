@@ -81,7 +81,7 @@ try {
   check("duplicate imports rejected without creating extra records");
 
   await page.getByRole("tab", { name: "话题总结" }).click();
-  await page.getByRole("button", { name: "生成精简总结" }).click();
+  await page.getByRole("button", { name: "生成详细总结" }).click();
   await page.getByRole("heading", { name: "模型设置", exact: true }).waitFor();
   assert.equal(await page.getByLabel("DeepSeek API Key").getAttribute("type"), "password");
   await page.getByRole("button", { name: "关闭弹窗" }).click();
@@ -102,7 +102,7 @@ try {
   await page.reload();
   await page.getByRole("heading", { name: "我的话题." }).waitFor();
   await page.getByRole("heading", { name: "大学生求职 · 验收" }).click();
-  await page.getByRole("button", { name: "生成精简总结" }).waitFor();
+  await page.getByRole("button", { name: "生成详细总结" }).waitFor();
   check("saved topic and pasted text survive full page reload");
 
   for (const width of [390, 360, 768, 1440]) {

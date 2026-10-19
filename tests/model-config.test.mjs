@@ -11,7 +11,7 @@ const endpoints = {
 };
 for (const provider of providerIds) {
   test(`${provider}: a user key goes only to the selected official endpoint`, () => {
-    const config = resolveModelConfig({ provider, apiKey: `test-only-${provider}` }, { MODEL_API_KEY: "server-key", MODEL_BASE_URL: "https://other.example/v1", MODEL_NAME: "server-model" });
+    const config = resolveModelConfig({ provider, apiKey: `test-only-${provider}`, model: providers[provider].models[0] }, { MODEL_API_KEY: "server-key", MODEL_BASE_URL: "https://other.example/v1", MODEL_NAME: "server-model" });
     const request = buildModelRequest(config, "请输出 JSON", "待整理的原始文本");
     assert.equal(request.endpoint, endpoints[provider]);
     assert.equal(request.init.headers.Authorization, `Bearer test-only-${provider}`);
@@ -24,7 +24,7 @@ for (const provider of providerIds) {
 }
 
 test("provider-specific parameters preserve non-thinking JSON generation", () => {
-  const payload = provider => JSON.parse(buildModelRequest(resolveModelConfig({ provider, apiKey: "test" }, {}), "system", "input").init.body);
+  const payload = provider => JSON.parse(buildModelRequest(resolveModelConfig({ provider, apiKey: "test", model: providers[provider].models[0] }, {}), "system", "input").init.body);
   assert.deepEqual(payload("deepseek").thinking, { type: "disabled" });
   assert.deepEqual(payload("glm").thinking, { type: "disabled" });
   assert.equal(payload("qwen").enable_thinking, false);

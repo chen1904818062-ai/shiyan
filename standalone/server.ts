@@ -13,6 +13,7 @@ import * as conversations from "../app/api/topics/[id]/conversations/route.ts";
 import * as conversation from "../app/api/conversations/[id]/route.ts";
 import * as summarize from "../app/api/topics/[id]/summarize/route.ts";
 import * as model from "../app/api/model/route.ts";
+import * as modelCatalog from "../app/api/model/models/route.ts";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const host = process.env.HOST || "0.0.0.0";
@@ -58,6 +59,7 @@ async function route(request: Request, address: string): Promise<Response> {
     if (pathname === "/api/session" && request.method === "GET") return json({ displayName: process.env.APP_DISPLAY_NAME || "我的空间" });
     if (pathname === "/" && request.method === "GET") return html(await readFile(join(directory, "public/index.html"), "utf8"));
     if (pathname === "/api/model" && request.method === "GET") return model.GET();
+    if (pathname === "/api/model/models" && request.method === "POST") return modelCatalog.POST(request);
     if (pathname === "/api/topics" && request.method === "GET") return topics.GET();
     if (pathname === "/api/topics" && request.method === "POST") return topics.POST(request);
     let match = /^\/api\/topics\/([a-zA-Z0-9-]+)$/.exec(pathname);
@@ -99,7 +101,7 @@ const server = createServer(async (incoming, outgoing) => {
     await respond(outgoing, error instanceof ApiError ? json({ error: error.message }, error.status) : json({ error: "服务暂时不可用，请稍后重试。" }, 503));
   }
 });
-server.requestTimeout = 120_000;
+server.requestTimeout = 180_000;
 server.headersTimeout = 15_000;
 server.listen(port, host, () => console.log(`Shiyan beta listening on ${host}:${port}`));
 let shuttingDown = false;

@@ -4,6 +4,7 @@ import { currentWeek, inImportWeek, summaryInput, SUMMARY_SYSTEM, validateSummar
 import type { Conversation } from "@/lib/types";
 import { providerIds } from "@/lib/providers";
 import { resolveModelConfig, buildModelRequest, ModelConfigurationError } from "@/lib/model-config";
+import { modelIdentity } from "@/lib/model-response";
 
 export const POST = api(async (request: Request, route: { params: Promise<{ id: string }> }) => {
   const { db, ownerId } = await context(); const { id } = await route.params;
@@ -27,18 +28,20 @@ export const POST = api(async (request: Request, route: { params: Promise<{ id: 
     if (error instanceof ModelConfigurationError) throw new ApiError(error.message, error.status);
     throw new ApiError("模型服务配置不正确，请检查后重试。", 503);
   }
-  const model = config.model;
+  const requestedModel = config.model;
   let upstream: Response;
   try {
-    upstream = await fetch(requestConfig.endpoint, { ...requestConfig.init, signal: AbortSignal.timeout(90_000) });
+    upstream = await fetch(requestConfig.endpoint, { ...requestConfig.init, signal: AbortSignal.timeout(150_000) });
   } catch { throw new ApiError("模型连接超时或暂时不可用。原始对话已保存，请稍后重试。", 504); }
   if (!upstream.ok) {
     const message = upstream.status === 401 ? "API Key 无效，请确认密钥与所选提供商一致。" : upstream.status === 402 ? "模型账户余额不足，请检查后重试。" : upstream.status === 403 ? "当前账户无权调用该模型，请检查模型权限及密钥所属地域。" : upstream.status === 400 || upstream.status === 404 ? "模型名称或调用参数不受支持，请换用预设模型，或检查该模型是否支持 JSON 输出。" : upstream.status === 429 ? "模型请求较频繁，请稍后重试。" : "模型暂时无法完成总结，请稍后重试。";
     throw new ApiError(message, 502);
   }
   let summary;
+  let modelInfo;
   try {
-    const completion = await upstream.json() as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
+    const completion = await upstream.json() as { model?: unknown; choices?: { message?: { content?: string }; finish_reason?: string }[] };
+    modelInfo = modelIdentity(requestedModel, completion.model);
     if (completion.choices?.[0]?.finish_reason === "length") throw new Error();
     const text = completion.choices?.[0]?.message?.content;
     if (!text) throw new Error();
@@ -48,8 +51,9 @@ export const POST = api(async (request: Request, route: { params: Promise<{ id: 
   await ownedTopic(db, ownerId, id);
   const existing = (await db.prepare("SELECT id FROM conversations WHERE topic_id = ?").bind(id).all<{ id: string }>()).results;
   if (conversations.some(c => !existing.some(e => e.id === c.id))) throw new ApiError("生成期间原始对话发生了删除，请重新生成。", 409);
-  const report = { id: reportId, topicId: id, kind, weekStart, summary, sourceIds: conversations.map(c => c.id), model, createdAt: now };
-  const inserted = await db.prepare("INSERT INTO reports (id, topic_id, kind, week_start, summary_json, source_ids_json, model, created_at) SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM topics WHERE id = ? AND owner_id = ?) AND (SELECT COUNT(*) FROM conversations WHERE topic_id = ? AND id IN (SELECT value FROM json_each(?))) = ?").bind(reportId, id, kind, weekStart, JSON.stringify(summary), JSON.stringify(report.sourceIds), model, now, id, ownerId, id, JSON.stringify(report.sourceIds), report.sourceIds.length).run();
+  const model = modelInfo.returnedModel || requestedModel;
+  const report = { id: reportId, topicId: id, kind, weekStart, summary, sourceIds: conversations.map(c => c.id), model, modelInfo, createdAt: now };
+  const inserted = await db.prepare("INSERT INTO reports (id, topic_id, kind, week_start, summary_json, source_ids_json, model, created_at) SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM topics WHERE id = ? AND owner_id = ?) AND (SELECT COUNT(*) FROM conversations WHERE topic_id = ? AND id IN (SELECT value FROM json_each(?))) = ?").bind(reportId, id, kind, weekStart, JSON.stringify({ ...summary, modelInfo }), JSON.stringify(report.sourceIds), model, now, id, ownerId, id, JSON.stringify(report.sourceIds), report.sourceIds.length).run();
   if (inserted.meta.changes === 0) throw new ApiError("生成期间原文或话题已被删除，请刷新后重新整理。", 409);
   return json({ report }, 201);
 });

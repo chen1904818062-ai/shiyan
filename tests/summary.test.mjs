@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseRoles, currentWeek, chinaDate, inImportWeek, validateSummary, summaryInput } from "../lib/summary.ts";
+import { highlightMarkdown } from "../lib/report-export.ts";
 
 test("preserves unlabelled text without inventing speakers", () => {
   assert.deepEqual(parseRoles("我想了解求职。\n可以准备一份简历。"), [{ role: "unknown", text: "我想了解求职。\n可以准备一份简历。" }]);
@@ -24,6 +25,19 @@ test("weekly import interval is start-inclusive and end-exclusive", () => {
 const summary = () => ({ overview: "讨论了简历准备。", highlights: [{ title: "准备简历", text: "梳理已有经历。", sourceIds: ["c1"] }], positions: [], questions: [], suggestions: [], uncertainty: "" });
 test("accepts a concise grounded report", () => {
   assert.equal(validateSummary(summary(), [{ id: "c1", content: "用户：我想准备简历。" }]).highlights.length, 1);
+});
+
+test('detailed reports preserve steps, source examples and conditions in validation and export',()=>{
+  const value=summary();
+  value.highlights[0].details=[{text:'先整理两段校园经历，分别写清个人承担的工作。',sourceIds:['c1']}];
+  value.highlights[0].steps=[{text:'核实数据后，按背景、任务、行动和结果组织。',sourceIds:['c1']}];
+  value.highlights[0].examples=[{text:'原文例子：协调3个社团。',sourceIds:['c1']}];
+  value.highlights[0].caveats=[{text:'没有可核实的数字时，写具体产出，不编数字。',sourceIds:['c1']}];
+  const parsed=validateSummary(value,[{id:'c1',content:'用户：我想整理简历。AI：原文资料。'}]);
+  const markdown=highlightMarkdown(parsed.highlights[0],item=>'- '+item.text);
+  assert.match(markdown,/1\. 核实数据/);assert.match(markdown,/协调3个社团/);assert.match(markdown,/不编数字/);
+  value.highlights[0].steps[0].sourceIds=['invented'];
+  assert.throws(()=>validateSummary(value,[{id:'c1',content:'原文'}]),/不存在/);
 });
 test("rejects invented original citations", () => {
   const value = summary(); value.highlights[0].sourceIds = ["invented"];

@@ -1,6 +1,7 @@
 export const providerIds = ["deepseek", "glm", "qwen", "kimi"] as const;
 export type ProviderId = typeof providerIds[number];
-export type ModelChoice = { apiKey: string; model: string };
+export type DiscoveredModel = { id: string; name: string };
+export type ModelChoice = { apiKey: string; model: string; availableModels?: DiscoveredModel[] };
 export type ModelChoices = Partial<Record<ProviderId, ModelChoice>>;
 
 type Provider = { label: string; mark: string; baseURL: string; models: readonly string[]; keyURL: string; note: string };
@@ -30,7 +31,7 @@ export const providers: Record<ProviderId, Provider> = {
 };
 
 export function defaultChoice(provider: ProviderId): ModelChoice {
-  return { apiKey: "", model: providers[provider].models[0] };
+  return { apiKey: "", model: "" };
 }
 
 export function isProviderId(value: unknown): value is ProviderId {

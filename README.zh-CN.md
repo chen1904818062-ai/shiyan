@@ -1,13 +1,13 @@
 # 拾言 · 对话整理 Agent
 
-第一版支持创建话题、复制粘贴来自不同 AI 的对话、留存完整原文、生成可追溯的精简总结，以及按周回顾。界面适配手机与电脑。
+第一版支持创建话题、复制粘贴来自不同 AI 的对话、留存完整原文、生成可追溯的详细总结，以及按周回顾。报告包含简短概览、具体内容、操作步骤、原文例子和适用条件；篇幅随材料量变化。界面适配手机与电脑。
 
 ## 使用
 
 1. 登录私人站点，创建话题，例如「大学生求职」，可填写整理范围。
 2. 点击「添加对话」，填写标题、选择来源、粘贴10～50,000字的文本。原始对话日期可以留空。
 3. 可多次添加对话，相同内容会去重。保留「用户：」「AI：」「ChatGPT：」等角色标记，有助于区分你的想法与 AI 的建议。
-4. 在「模型设置」选择 DeepSeek、智谱 GLM、通义千问或 Kimi，填写该提供商的 API Key，再选择预设模型或自定义模型名称。各提供商的配置独立暂存在当前页面内存中，切换时不会把某一家的密钥带到另一家；刷新后需要重新填写。密钥不存入数据库或浏览器持久存储。
+4. 在「模型设置」选择 DeepSeek、智谱 GLM、通义千问或 Kimi，填写该提供商的 API Key，点击「读取可用模型」（离开密钥输入框时也会读取）。列表来自平台接口；多个型号由用户选择，单个自动填入。不会默认改用旧型号。各提供商的配置独立暂存在当前页面内存中；刷新后需要重新填写。密钥不存入数据库或浏览器持久存储。
 5. 点击总结要点下的来源标签查看对应原文；新增对话后可更新总结。可以导出 Markdown，文件包含总结和对应原文。
 6. 「每周回顾」按北京时间的**导入日期**筛选，周一为一周起点，不把导入时间当作原始对话时间。第一版通过点击按钮生成周报。
 
@@ -21,12 +21,12 @@
 - 模型请求会发送所选话题范围内的原文。报告校验格式与引用 ID；角色无法确认的原文不能作为「已明确的个人想法」的唯一依据。语义准确性仍需用户结合原文核对。
 - 删除一段对话会清除该话题的已有报告，以避免残留对已删除原文的引用。确认弹窗会明确告知；之后可根据剩余内容重新整理。
 - 同一话题最多展示最近100次报告，可通过「整理记录」切换。
-- 模型预设包括 DeepSeek（`deepseek-flash`、`deepseek-v4-pro`）、智谱 GLM（`glm-4.7`、`glm-4.7-flashx`）、通义千问（`qwen-plus`、`qwen-flash`）、Kimi（`kimi-k2.6`）。也可填写同一提供商的其他模型 ID，需要支持 Chat Completions 与 JSON 输出，实际可用性取决于账户权限。
+- 模型列表由对应平台 `/models` 动态读取，API Key 通常可访问多个型号，不能据此推断用户唯一想用的型号。目录可能不完整，也不代表已验证调用权限、余额或 JSON 支持；平台不支持读取时会明确提示，可按平台控制台手动填写型号。报告分别保存请求型号和接口返回型号，不一致或未返回时提示；历史报告仅有请求型号，不能视为已核验。
 - 用户填写的密钥只发送到所选提供商固定的官方接口，不接受浏览器传入任意服务地址。千问使用百炼北京地域密钥，Kimi 使用 Moonshot 中国站密钥。对话来源标签不会影响总结模型的选择。
 - 服务端可用 `MODEL_API_KEY`、`MODEL_PROVIDER`、`MODEL_BASE_URL`、`MODEL_NAME` 配置默认服务。`MODEL_PROVIDER` 可选 `deepseek` / `glm` / `qwen` / `kimi`；留空接口地址和模型名称时使用所选提供商的默认值。已有仅配置 DeepSeek 或自定义兼容接口的环境变量继续有效。
 - 显式选择某个提供商但未填写对应密钥时，会提示配置，不会自动借用另一提供商的服务端密钥。服务端已配置时，设置页可以明确选择「使用服务端配置」。
 
-接口实现参考 [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/)、[智谱 GLM-4.7](https://docs.bigmodel.cn/cn/guide/models/text/glm-4.7)、[千问兼容接口](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope)、[千问结构化输出](https://help.aliyun.com/zh/model-studio/qwen-structured-output) 和 [Kimi Chat Completions](https://platform.kimi.com/docs/api/chat)。预设模型默认使用非思考参数；自定义的思考模型可能需要更多生成时间及输出预算，失败时可切回预设模型。
+接口实现参考 [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/)、[GLM-5.3-Flash 官方说明](https://docs.z.ai/guides/vlm/glm-5.3-flash)、[千问兼容接口](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope)、[千问结构化输出](https://help.aliyun.com/zh/model-studio/qwen-structured-output) 和 [Kimi Chat Completions](https://platform.kimi.com/docs/api/chat)。GLM-5.3-Flash 系列保留必须开启的思考模式；不同模型的响应时间、额度和参数支持不同，不会自动换用别的型号。
 
 ## 本地开发
 

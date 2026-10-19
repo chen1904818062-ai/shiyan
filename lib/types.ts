@@ -8,9 +8,11 @@ export type Conversation = {
   conversationDate: string | null; importedAt: string;
 };
 export type SummaryItem = { text: string; sourceIds: string[] };
+export type SummaryHighlight = SummaryItem & { title: string; details?: SummaryItem[]; steps?: SummaryItem[]; examples?: SummaryItem[]; caveats?: SummaryItem[] };
+export type ModelInfo = { requestedModel: string; returnedModel: string | null; status: "matched" | "different" | "unreported" };
 export type Summary = {
   overview: string;
-  highlights: (SummaryItem & { title: string })[];
+  highlights: SummaryHighlight[];
   positions: SummaryItem[];
   questions: SummaryItem[];
   suggestions: SummaryItem[];
@@ -18,6 +20,6 @@ export type Summary = {
 };
 export type Report = {
   id: string; topicId: string; kind: "topic" | "week"; weekStart: string | null;
-  summary: Summary; sourceIds: string[]; model: string; createdAt: string;
+  summary: Summary; sourceIds: string[]; model: string; modelInfo?: ModelInfo; createdAt: string;
 };
 export type TopicDetail = { topic: Topic; conversations: Conversation[]; reports: Report[] };
