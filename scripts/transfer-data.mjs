@@ -9,12 +9,17 @@ const tables = {
   shiyan_identities: ["channel", "address", "user_id", "verified_at"],
   topics: ["id", "owner_id", "title", "description", "color", "created_at", "updated_at"],
   conversations: ["id", "topic_id", "title", "source", "content", "content_hash", "conversation_date", "imported_at"],
+  memories: ["id","owner_id","kind","statement","statement_key","detail","occurred_at","occurred_precision","basis","confidence","status","sensitivity","source_conversation_id","source_role","thread_id","created_at","updated_at"],
+  memory_evidence: ["id","memory_id","conversation_id","quote","char_start","char_end","speaker_role","created_at"],
+  memory_revisions: ["id","memory_id","before_json","after_json","reason","created_at"],
+  memory_extractions: ["conversation_id","owner_id","extracted_at"],
+  threads: ["id","owner_id","domain","title","summary","status","started_at","updated_at"],
   reports: ["id", "topic_id", "kind", "week_start", "summary_json", "source_ids_json", "model", "created_at"],
 };
 const { client } = openDatabase();
 try {
   if (operation === "export") {
-    const data = { version: 2, exportedAt: new Date().toISOString(), tables: {} };
+    const data = { version: 3, exportedAt: new Date().toISOString(), tables: {} };
     for (const [table, columns] of Object.entries(tables)) {
       const result = await client.execute(`SELECT ${columns.join(",")} FROM ${table} ORDER BY ${columns[0]}`);
       data.tables[table] = result.rows.map(row => Object.fromEntries(columns.map(column => [column, row[column]])));
@@ -23,11 +28,11 @@ try {
     console.log(JSON.stringify({ exported: true, rows: Object.fromEntries(Object.entries(data.tables).map(([name, rows]) => [name, rows.length])) }));
   } else {
     const data = JSON.parse(await readFile(path.resolve(filename), "utf8"));
-    if (![1, 2].includes(data.version) || !data.tables) throw new Error("Invalid backup format");
+    if (![1, 2, 3].includes(data.version) || !data.tables) throw new Error("Invalid backup format");
     await migrate(client, [path.resolve("drizzle"), path.resolve("standalone/migrations")]);
     const statements = [];
     for (const [table, columns] of Object.entries(tables)) {
-      if (data.version === 1 && table.startsWith("shiyan_")) {
+      if ((data.version === 1 && table.startsWith("shiyan_")) || (data.version < 3 && (table.startsWith("memor") || table === "threads"))) {
         const existing = await client.execute(`SELECT COUNT(*) AS count FROM ${table}`);
         if (Number(existing.rows[0].count)) throw new Error("Target database is not empty; import refused");
         continue;

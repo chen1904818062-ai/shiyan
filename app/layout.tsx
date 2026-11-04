@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./memory.css";
 
 export const metadata: Metadata = {
-  title: "拾言 · 让每次对话，都有所留",
-  description: "汇集 AI 对话，按话题整理成几分钟就能读完的回顾。",
+  title: "拾言 · 个人 AI 记忆系统",
+  description: "将对话和经历沉淀为可追溯、可更新、可调用的个人记忆。",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

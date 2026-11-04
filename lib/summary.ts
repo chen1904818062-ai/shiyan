@@ -12,19 +12,57 @@ export const summarySchema = z.object({
   uncertainty: z.string().max(1000).default(""),
 });
 
-export function parseRoles(content: string) {
-  const result: { role: "user" | "assistant" | "unknown"; text: string }[] = [];
-  let role: "user" | "assistant" | "unknown" = "unknown";
+export type Role = "user" | "assistant" | "unknown";
+export type RoleSegment = { role: Role; text: string; start: number; end: number };
+
+const USER_LABEL = /^(?:用户|我|你说|您说|User|You(?: said)?|Human)\s*[:：]\s*(.*)$/i;
+const AI_LABEL = /^(?:ChatGPT(?: said|\s*说)?|DeepSeek|豆包|助手|AI|Assistant|机器人)\s*[:：]\s*(.*)$/i;
+
+// 带字符区间的角色分段：记忆抽取需要据此判断某句原文是谁说的。
+export function roleSegments(content: string): RoleSegment[] {
+  const result: RoleSegment[] = [];
+  let role: Role = "unknown";
   let lines: string[] = [];
-  const flush = () => { const text = lines.join("\n").trim(); if (text) result.push({ role, text }); lines = []; };
-  for (const line of content.split(/\r?\n/)) {
-    const user = /^(?:用户|我|你说|您说|User|You(?: said)?|Human)\s*[:：]\s*(.*)$/i.exec(line.trim());
-    const ai = /^(?:ChatGPT(?: said|\s*说)?|DeepSeek|豆包|助手|AI|Assistant|机器人)\s*[:：]\s*(.*)$/i.exec(line.trim());
-    if (user || ai) { flush(); role = user ? "user" : "assistant"; lines.push((user || ai)![1]); }
-    else lines.push(line);
+  let segStart = 0;
+  const flush = (end: number) => {
+    const text = lines.join("\n").trim();
+    if (text) result.push({ role, text, start: segStart, end });
+    lines = [];
+  };
+  let pos = 0;
+  while (pos <= content.length) {
+    const nl = content.indexOf("\n", pos);
+    const lineEnd = nl === -1 ? content.length : (nl > pos && content[nl - 1] === "\r" ? nl - 1 : nl);
+    const line = content.slice(pos, lineEnd);
+    const trimmed = line.trim();
+    const user = USER_LABEL.exec(trimmed);
+    const ai = AI_LABEL.exec(trimmed);
+    if (user || ai) {
+      flush(pos);
+      role = user ? "user" : "assistant";
+      const rest = (user || ai)![1];
+      const at = line.indexOf(rest);
+      segStart = at >= 0 ? pos + at : pos;
+      lines = [rest];
+    } else {
+      lines.push(line);
+    }
+    if (nl === -1) { flush(content.length); break; }
+    pos = nl + 1;
   }
-  flush();
   return result;
+}
+
+export function roleAt(content: string, offset: number): Role {
+  const segments = roleSegments(content);
+  for (const segment of segments) if (offset >= segment.start && offset < segment.end) return segment.role;
+  let role: Role = "unknown";
+  for (const segment of segments) if (segment.start <= offset) role = segment.role;
+  return role;
+}
+
+export function parseRoles(content: string) {
+  return roleSegments(content).map(({ role, text }) => ({ role, text }));
 }
 
 export function chinaDate(value = new Date()) {

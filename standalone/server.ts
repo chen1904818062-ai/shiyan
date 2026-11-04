@@ -16,6 +16,10 @@ import * as conversation from "../app/api/conversations/[id]/route.ts";
 import * as summarize from "../app/api/topics/[id]/summarize/route.ts";
 import * as model from "../app/api/model/route.ts";
 import * as modelCatalog from "../app/api/model/models/route.ts";
+import * as memories from "../app/api/memories/route.ts";
+import * as memory from "../app/api/memories/[id]/route.ts";
+import * as memoryExtract from "../app/api/memories/extract/route.ts";
+import * as memoryAsk from "../app/api/memories/ask/route.ts";
 import { APP_VERSION } from "../lib/version.ts";
 
 const directory = dirname(fileURLToPath(import.meta.url));
@@ -95,6 +99,17 @@ async function route(request: Request, address: string): Promise<Response> {
     if (pathname === "/" && request.method === "GET") return html(await readFile(join(directory, "public/index.html"), "utf8"));
     if (pathname === "/api/model" && request.method === "GET") return model.GET();
     if (pathname === "/api/model/models" && request.method === "POST") return modelCatalog.POST(request);
+    if (pathname === "/api/memories" && request.method === "GET") return memories.GET(request);
+    if (pathname === "/api/memories" && request.method === "POST") return memories.POST(request);
+    if (pathname === "/api/memories/extract" && request.method === "POST") return memoryExtract.POST(request);
+    if (pathname === "/api/memories/ask" && request.method === "POST") return memoryAsk.POST(request);
+    const memoryMatch = /^\/api\/memories\/([a-zA-Z0-9-]+)$/.exec(pathname);
+    if (memoryMatch) {
+      const params = { params: Promise.resolve({ id: memoryMatch[1] }) };
+      if (request.method === "GET") return memory.GET(request, params);
+      if (request.method === "PATCH") return memory.PATCH(request, params);
+      if (request.method === "DELETE") return memory.DELETE(request, params);
+    }
     if (pathname === "/api/topics" && request.method === "GET") return topics.GET();
     if (pathname === "/api/topics" && request.method === "POST") return topics.POST(request);
     let match = /^\/api\/topics\/([a-zA-Z0-9-]+)$/.exec(pathname);
@@ -109,6 +124,7 @@ async function route(request: Request, address: string): Promise<Response> {
       return match[2] === "conversations" ? conversations.POST(request, params) : summarize.POST(request, params);
     }
     match = /^\/api\/conversations\/([a-zA-Z0-9-]+)$/.exec(pathname);
+    if (match && request.method === "GET") return conversation.GET(request, { params: Promise.resolve({ id: match[1] }) });
     if (match && request.method === "DELETE") return conversation.DELETE(request, { params: Promise.resolve({ id: match[1] }) });
     return json({ error: "没有找到这个页面。" }, 404);
   });

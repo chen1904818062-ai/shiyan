@@ -21,7 +21,7 @@ try {
   assert.equal((await context.request.get(base + "/api/topics", { headers: { "oai-authenticated-user-id": "local_seedy", "oai-authenticated-user-email": "fake@test.invalid" } })).status(), 401);
   check("anonymous access and forged identity headers rejected");
 
-  await signIn(page, base);
+  await signIn(page, base); await page.getByRole('navigation', {name:'主导航'}).getByRole('button', {name:/我的话题/}).click();
   await page.getByRole("heading", { name: "我的话题." }).waitFor();
   await page.getByText("你的思考收藏，从这里开始").waitFor();
   assert.equal((await context.request.get(base + "/api/topics")).status(), 200);
@@ -99,7 +99,7 @@ try {
   assert.equal((await context.request.get(`${base}/api/topics/not-owned`)).status(), 404);
   check("server validates lengths, calendar dates, sources, newline-normalized duplicates and ownership");
 
-  await page.reload();
+  await page.reload(); await page.getByRole('navigation', {name:'主导航'}).getByRole('button', {name:/我的话题/}).click();
   await page.getByRole("heading", { name: "我的话题." }).waitFor();
   await page.getByRole("heading", { name: "大学生求职 · 验收" }).click();
   await page.getByRole("button", { name: "生成详细总结" }).waitFor();

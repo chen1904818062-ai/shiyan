@@ -24,10 +24,10 @@ function wire(path, accept) {
 try {
   await new Promise((ready, fail) => { const timer = setTimeout(() => fail(new Error("Server startup timeout")), 15_000); server.stdout.on("data", value => { if (String(value).includes("listening")) { clearTimeout(timer); ready(); } }); server.once("exit", code => { clearTimeout(timer); fail(new Error("Server exited " + code)); }); });
   const html = await (await fetch(base + "/login")).text();
-  assert.match(html, /aria-label="邮箱地址"/); assert.match(html, /assets\/auth.css\?v=1.1.1/); assert.ok(!html.includes("正在读取登录方式")); assert.ok(!html.includes("test-only"));
-  const raw = await wire("/assets/auth.js?v=1.1.1", "identity");
-  const br = await wire("/assets/auth.js?v=1.1.1", "br, gzip");
-  const gz = await wire("/assets/auth.js?v=1.1.1", "br;q=0, gzip;q=1");
+  assert.match(html, /aria-label="邮箱地址"/); assert.match(html, /assets\/auth.css\?v=1.3.0/); assert.ok(!html.includes("正在读取登录方式")); assert.ok(!html.includes("test-only"));
+  const raw = await wire("/assets/auth.js?v=1.3.0", "identity");
+  const br = await wire("/assets/auth.js?v=1.3.0", "br, gzip");
+  const gz = await wire("/assets/auth.js?v=1.3.0", "br;q=0, gzip;q=1");
   const plain = await wire("/assets/auth.js", "br;q=0,gzip;q=0");
   assert.equal(br.headers["content-encoding"], "br"); assert.equal(gz.headers["content-encoding"], "gzip"); assert.equal(plain.headers["content-encoding"], undefined);
   assert.deepEqual(brotliDecompressSync(br.body), raw.body); assert.deepEqual(gunzipSync(gz.body), raw.body); assert.equal(br.headers.vary, "Accept-Encoding");

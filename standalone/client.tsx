@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import Workspace from "../app/workspace";
 import "../app/globals.css";
+import "../app/memory.css";
 
 async function start() {
   try {

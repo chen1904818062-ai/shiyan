@@ -19,7 +19,7 @@ try {
   await page.goto(base+'/login');await page.getByLabel('访问密码',{exact:true}).fill(password);await page.getByRole('button',{name:'进入私人空间'}).click();
   const topic=await (await context.request.post(base+'/api/topics',{data:{title:'详细整理验收'}})).json();const topicId=topic.topic.id;
   await context.request.post(`${base}/api/topics/${topicId}/conversations`,{data:{title:'虚构简历素材',source:'豆包',content:'用户：我决定先核实活动记录。\nAI：列出两段校园活动，核实数据再按背景、任务、行动、结果组织，并对照岗位要求。例子：协调3个社团完成现场签到。没有可靠数字时写具体产出，不编造数据。'}});
-  await page.reload();await page.getByRole('heading',{name:'详细整理验收',exact:true}).click();
+  await page.reload(); await page.getByRole('navigation', {name:'主导航'}).getByRole('button', {name:/我的话题/}).click();await page.getByRole('heading',{name:'详细整理验收',exact:true}).click();
   assert.equal((await context.request.post(`${base}/api/topics/${topicId}/summarize`,{data:{provider:'glm',apiKey:'test-many'}})).status(),422);
   const open=async()=>{await page.getByRole('button',{name:'打开模型设置',exact:true}).click();await page.getByLabel('模型提供商',{exact:true}).selectOption('glm');};
   const fill=async key=>{await page.getByLabel('智谱 GLM API Key',{exact:true}).fill(key);await page.getByLabel('智谱 GLM API Key',{exact:true}).blur();};
@@ -47,7 +47,7 @@ try {
   check('mismatched identities are visible and detailed Markdown export is complete');
   await page.screenshot({path:'.sites-runtime/screenshots/detailed-summary-desktop.png',fullPage:true});
   await open();await fill('test-unreported');await waitModels();await page.getByLabel('模型',{exact:true}).selectOption('glm-5.3-flash');await page.getByRole('button',{name:'应用配置'}).click();report=await generate('重新整理');assert.equal(report.modelInfo.status,'unreported');await page.getByText(/接口未返回型号/).waitFor();
-  await page.reload();await page.getByRole('heading',{name:'详细整理验收',exact:true}).click();await page.getByText(/接口未返回型号/).waitFor();await open();assert.equal(await page.getByLabel('智谱 GLM API Key',{exact:true}).inputValue(),'');
+  await page.reload(); await page.getByRole('navigation', {name:'主导航'}).getByRole('button', {name:/我的话题/}).click();await page.getByRole('heading',{name:'详细整理验收',exact:true}).click();await page.getByText(/接口未返回型号/).waitFor();await open();assert.equal(await page.getByLabel('智谱 GLM API Key',{exact:true}).inputValue(),'');
   await fill('test-many');await waitModels();await page.setViewportSize({width:390,height:844});await page.screenshot({path:'.sites-runtime/screenshots/model-discovery-mobile.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.keyboard.press('Escape');
   await page.waitForFunction(()=>document.querySelector('.sidebar').getBoundingClientRect().right<=1);await page.screenshot({path:'.sites-runtime/screenshots/detailed-summary-mobile.png',fullPage:true});assert.deepEqual(errors,[]);
   check('unreported identities stay honest after reload; keys clear and phone layout fits');

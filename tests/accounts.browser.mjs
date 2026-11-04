@@ -42,7 +42,7 @@ try {
   const created = await (await context.request.post(base + "/api/topics", { data: { title: "Alice 的独立求职空间" } })).json();
   const topic = created.topic.id;
   await context.request.post(`${base}/api/topics/${topic}/conversations`, { data: { title: "私人求职原文", source: "豆包", content: "用户：这是Alice的求职经历，请帮我整理。AI：请按岗位要求写清楚成果。" } });
-  await page.reload(); await page.getByRole("heading", { name: "Alice 的独立求职空间", exact: true }).waitFor();
+  await page.reload(); await page.getByRole('navigation', {name:'主导航'}).getByRole('button', {name:/我的话题/}).click(); await page.getByRole("heading", { name: "Alice 的独立求职空间", exact: true }).waitFor();
   const second = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const other = await second.newPage(); other.on("pageerror", error => errors.push(error.message));
   await other.goto(base + "/login"); await other.getByLabel("邮箱地址", { exact: true }).waitFor();

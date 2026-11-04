@@ -18,6 +18,7 @@ export const DELETE = api(async (_request: Request, route: Params) => {
   const { db, ownerId } = await context(); const { id } = await route.params;
   await ownedTopic(db, ownerId, id);
   await db.batch([
+    db.prepare(`UPDATE memories SET source_conversation_id = (SELECT e.conversation_id FROM memory_evidence e INNER JOIN conversations c ON c.id=e.conversation_id WHERE e.memory_id=memories.id AND c.topic_id<>? ORDER BY e.created_at LIMIT 1) WHERE owner_id=? AND source_conversation_id IN (SELECT id FROM conversations WHERE topic_id=?) AND EXISTS (SELECT 1 FROM memory_evidence e INNER JOIN conversations c ON c.id=e.conversation_id WHERE e.memory_id=memories.id AND c.topic_id<>?)`).bind(id,ownerId,id,id),
     db.prepare("DELETE FROM reports WHERE topic_id = ? AND EXISTS (SELECT 1 FROM topics WHERE id = ? AND owner_id = ?)").bind(id, id, ownerId),
     db.prepare("DELETE FROM conversations WHERE topic_id = ? AND EXISTS (SELECT 1 FROM topics WHERE id = ? AND owner_id = ?)").bind(id, id, ownerId),
     db.prepare("DELETE FROM topics WHERE id = ? AND owner_id = ?").bind(id, ownerId),
