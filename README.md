@@ -1,34 +1,82 @@
-# 拾言 · 个人 AI 记忆系统 v1.3.0
+<p align="center"><img src="docs/assets/banner.svg" alt="拾言 · 个人 AI 记忆系统" width="100%"></p>
 
-将对话与经历沉淀为可追溯、可更新、可调用的个人记忆。支持记忆提炼、手动补充、确认与修订、证据原文、状态归档，以及基于已确认记忆的问答、探索计划与复盘反馈。
+<h1 align="center">拾言 · Shiyan</h1>
+<p align="center"><b>把与 AI 的对话和自己的经历，沉淀为可追溯、可更新、可调用的个人记忆。</b></p>
+<p align="center">个人 AI 记忆系统 v1.3.0 · React / TypeScript · Render + Turso</p>
+<p align="center"><a href="#功能一览">功能</a> · <a href="#开始使用">开始使用</a> · <a href="#开发与部署">开发部署</a> · <a href="docs/MEMORY_SYSTEM.md">记忆指南</a> · <a href="CHANGELOG.md">更新记录</a></p>
 
-默认只调用已确认的普通记忆；私密内容需单次允许。使用现有模型配置，按关键词检索最多24条记忆及其证据，回答标明来源。规划为建议，实际反馈由用户主动记录。
+## 为什么做拾言
 
-使用流程、当前边界和测试说明见 [AI记忆系统说明](docs/MEMORY_SYSTEM.md)。仍部署至现有 Render + Turso，不需要新增外部服务或密钥。问答和规划在当前页面中展示，可导出；记忆、原文和修订持久保存。
+和 ChatGPT、豆包、DeepSeek 聊过很多，真正需要时却找不到当时的思路。拾言从保存完整对话开始，让总结回到原文，让记忆经过你的确认，再用于问答、探索计划与复盘。
 
-## 原有对话与账号能力
+> 对话是原料，记忆是可以长期积累的资产。
 
+## 功能一览
 
-登录页优化：首屏直接显示表单，使用独立样式和预压缩静态资源；回车获取验证码、发送后自动聚焦、保留输入和倒计时，并提供网络失败重试及明确的发送、验证和跳转状态。手机端切换步骤保持布局稳定。
+| 能力 | 你能做什么 |
+| :--- | :--- |
+| 话题与对话归档 | 按主题粘贴多平台对话，保留完整原文，生成详细总结与每周回顾 |
+| 个人记忆档案 | 从对话提炼候选记忆，也可手动补充经历、目标和偏好 |
+| 证据与修订 | 回跳原文核对引文，确认、修订或归档记忆，保留修订历史 |
+| 与记忆对话 | 基于已确认记忆回顾和分析，回答附来源 |
+| 规划与复盘 | 生成探索步骤与验证方式，由你主动记录实际行动反馈 |
+| 多模型与导出 | 配置 DeepSeek、智谱 GLM、通义千问或 Kimi，导出 Markdown |
 
-新增 Resend 邮箱验证码、腾讯云 +86 手机验证码及账号数据隔离。现有服务已完成真实邮箱验证并开放邮箱注册；短信尚待配置。新部署的配置与原空间绑定步骤见 [账号接入说明](deploy/ACCOUNT_SETUP.md)。
+## 开始使用
 
-一个适合手机和电脑使用的私人网页：创建话题，粘贴来自 ChatGPT、豆包、DeepSeek 等平台的对话，保存完整原文，并在配置模型后生成有出处的详细总结和每周回顾。报告用简短概览开头，正文保留具体方法、步骤、原文例子和适用条件。
+1. **保存原料**：登录后在「我的话题」创建话题，粘贴对话；也可在「我的记忆」直接补充经历。
+2. **配置模型**：选择提供商，填写 API Key 并选择可用型号。没有密钥时，仍可保存原文与手动记忆。
+3. **提炼并核对**：提炼候选记忆，展开证据查看原句，确认、修订或标记不准确。
+4. **调用与复盘**：在「与记忆对话」提出问题，或进入「规划与复盘」生成建议、记录反馈。
 
-详细使用说明、模型配置、本地运行和验证步骤见 [中文开发文档](README.zh-CN.md)。
+完整操作及数据生命周期见 **[记忆系统使用指南](docs/MEMORY_SYSTEM.md)**。
 
-Render + Turso 个人版部署，以及之后腾讯云迁移的配置见 [独立部署说明](deploy/README.md)。独立运行构建使用 `npm run build:standalone`。
+## 数据与调用边界
 
-技术实现：React / TypeScript / Vinext；Sites 使用 Cloudflare D1，独立版使用 Render + Turso。支持 DeepSeek、智谱 GLM、通义千问和 Kimi。输入密钥后由服务端访问对应平台的 `/models`，展示接口返回的文本模型，多个型号由用户选择，单个自动填入。目录不等同于已验证调用权限；平台不支持目录时明确提示，可按平台控制台手动填写，不静默换型号。
+- **主动导入**：当前通过粘贴保存文本，不会自动连接或读取你的其他 AI 账号。
+- **先确认再调用**：默认只调用已确认的普通记忆；私密、敏感记忆需每次明确允许。所选内容会发送给你配置的模型提供商。
+- **有出处，可核对**：当前用关键词检索，最多发送 24 条记忆及证据；没有向量检索，可能遗漏同义表达。来源检查不能保证模型判断完全正确。
+- **建议由你落实**：规划不等于已发生的经历；问答和规划结果暂存在当前页面，可导出，刷新后不保留。记忆、原文与修订持久保存。
+- **账号隔离**：当前独立版支持邮箱验证码登录与个人数据空间隔离；手机验证码需另行配置。
 
-报告分别记录请求型号与接口返回型号，型号不一致、接口未返回型号、旧报告未核验都会明确显示。新元数据保存在原有报告 JSON 中，无须改变数据库表结构，备份和旧报告仍兼容。旧总结不会自动重写，需手动重新整理。
+模型目录不代表已验证调用权限。报告分别记录请求型号与接口返回型号；型号不一致、接口未返回型号和旧报告未核验均会提示。
 
-```powershell
+## 开发与部署
+
+当前独立部署使用 **Render + Turso**；原 Sites 运行方式使用 **Cloudflare D1**。两条路径的配置与初始化步骤不同。
+
+| 目的 | 文档与入口 |
+| :--- | :--- |
+| 部署独立版本 | [独立部署说明](deploy/README.md) |
+| 邮箱 / 手机账号配置 | [账号接入说明](deploy/ACCOUNT_SETUP.md) |
+| 本地 Sites / D1 开发 | [中文开发文档](README.zh-CN.md)（含早期运行方式说明） |
+| 功能边界与验证 | [记忆系统指南](docs/MEMORY_SYSTEM.md) |
+| 先前首页中的技术细节 | [开发记录](docs/ENGINEERING.md) |
+
+要求 **Node.js ≥ 22.13.0**。克隆后安装依赖：
+
+```bash
+git clone https://github.com/chen1904818062-ai/shiyan.git
+cd shiyan
 npm run install:ci
-npm run build
-node --test tests/summary.test.mjs tests/model-config.test.mjs tests/model-catalog.test.mjs tests/standalone.test.mjs
 ```
 
-首次本地运行须按中文文档初始化数据库。没有模型 API Key 时，创建话题、保存原文和查看明确标注的示例仍可用，真实总结需配置密钥后生成。
+按对应部署文档配置环境变量和数据库，再构建独立版：
 
-版本功能与使用范围见 [发布说明](CHANGELOG.md)。
+```bash
+npm run build:standalone
+```
+
+已有自动化检查包括：
+
+```bash
+node --test tests/memory.test.mjs tests/memory-system.test.mjs tests/standalone.test.mjs tests/accounts.test.mjs tests/model-config.test.mjs tests/model-catalog.test.mjs tests/summary.test.mjs
+```
+
+## 反馈与交流
+
+欢迎通过 [Issues](https://github.com/chen1904818062-ai/shiyan/issues) 反馈使用问题和改进建议。提交问题时请移除私人对话、验证码和 API Key。
+
+由 **[陈宇杰 · kalsookie](https://github.com/chen1904818062-ai)** 独立构建 · 另一个项目：[同频实验室](https://github.com/chen1904818062-ai/tongpinlab)
+
+<sub>Personal AI memory with traceable sources, human confirmation and revision history.</sub>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+<title id="title">拾言</title><desc id="desc">把对话，沉淀为有据可查的个人记忆。</desc>
+<defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity=".04"/></pattern><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#111b29"/><stop offset="1" stop-color="#192c36"/></linearGradient></defs>
+<rect width="1200" height="360" rx="20" fill="url(#bg)"/><rect width="1200" height="360" rx="20" fill="url(#grid)"/>
+<path d="M48 62H88" stroke="#c9b8ff" stroke-width="4"/>
+<g font-family="'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif"><text x="106" y="68" fill="#c9b8ff" font-size="14" letter-spacing="2">SHIYAN / PERSONAL AI MEMORY</text>
+<text x="48" y="166" fill="#f5f6f3" font-size="60" font-weight="700" letter-spacing="-1">拾言</text>
+<text x="50" y="218" fill="#c6d1d7" font-size="24">把对话，沉淀为有据可查的个人记忆。</text>
+<text x="50" y="311" fill="#c9b8ff" font-size="13" letter-spacing="2">CAPTURE   /   CONFIRM   /   RECALL</text><text x="1138" y="315" text-anchor="end" fill="#71858f" font-size="15">01</text></g>
+<g transform="translate(966 166)" fill="none" stroke="#c9b8ff"><circle r="100" stroke-opacity=".16"/><circle r="70" stroke-opacity=".25"/><circle r="40" stroke-opacity=".4"/><path d="M-112 66L-40-28L44 30L106-66" stroke-width="2" stroke-opacity=".7"/><path d="M-40-28L-15 87L106-66" stroke-opacity=".22"/>
+<circle cx="-112" cy="66" r="6" fill="#c9b8ff"/><circle cx="-40" cy="-28" r="9" fill="#c9b8ff"/><circle cx="44" cy="30" r="6" fill="#c9b8ff"/><circle cx="106" cy="-66" r="6" fill="#c9b8ff"/><circle cx="-15" cy="87" r="4" fill="#c9b8ff"/></g></svg>
