@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>拾言 · 记忆地图</title><link rel="stylesheet" href="./map.css">
+</head>
+<body>
+<header><a href="./" class="brand">拾言<span>MEMORY ATLAS</span></a><span class="local">只在你的浏览器中处理</span></header>
+<main>
+  <section class="intro"><p class="eyebrow">看见经历之间的联系</p><h1>你的记忆，有迹可循。</h1><p>从一个话题，到一次经历，再回到你亲自留下的原句。<br>这里展示真实的归档关系，连线不代表因果或心理判断。</p></section>
+  <section class="toolbar" aria-label="记忆导入与过滤">
+    <label class="upload">导入我的记忆<input id="file" type="file" accept="application/json,.json"></label>
+    <button id="demo">查看虚构示例</button><button id="clear">清除本页数据</button>
+    <label>查找<input id="search" type="search" placeholder="经历、话题、原句…" maxlength="100"></label>
+    <label>状态<select id="status"><option value="all">全部状态</option><option value="confirmed">已确认</option><option value="candidate">待确认</option><option value="revised">已修订</option><option value="retracted">已推翻</option><option value="expired">已过期</option></select></label>
+    <label class="permission"><input id="private" type="checkbox">本页显示私密及敏感记忆</label>
+  </section>
+  <p id="message" role="status">从拾言「记忆档案 → 导出记忆」取得 JSON 后导入。文件不会上传，也不会保存在此网站；刷新即清除。</p>
+  <section id="stats" class="stats" aria-label="记忆概览"></section>
+  <div class="view-nav" role="group" aria-label="视图"><button id="graph-tab" aria-pressed="true">关系地图</button><button id="timeline-tab" aria-pressed="false">经历时间线</button><span id="scope"></span></div>
+  <section class="atlas">
+    <div class="canvas"><div id="graph"><svg id="map" viewBox="0 0 1000 700" role="group" aria-label="话题、类型与记忆的关联地图"></svg><p class="caption">话题 → 记忆类型 → 具体记忆。点击记忆节点，查看细节与证据。</p></div><div id="timeline" hidden></div></div>
+    <aside id="detail" aria-live="polite"><p class="eyebrow">一条记忆的来路</p><h2>从地图上的一个点开始。</h2><p>每个记忆节点都可点击。你会看到陈述、背景、状态和原句证据。</p></aside>
+  </section>
+  <section class="notes"><h2>如何理解这张地图</h2><p>连接按已存储的话题和类型建立，不自动推断亲密关系、人格或职业适合度。时间线只使用明确记录的发生日期；未记录的日期单独呈现。“已确认”表示用户核对过记录，不代表外部事实已获验证。</p><p>为保持流畅，单次地图与时间线最多显示 200 条；概览统计基于当前筛选结果。可以用关键词或状态缩小范围。支持最多 2,000 条、10 MB 的拾言个人导出文件，不接收管理员整库备份。</p><a href="https://shiyan-beta.onrender.com" target="_blank" rel="noreferrer">回到拾言，管理我的记忆 ↗</a></section>
+</main><footer>拾言 · 个人 AI 记忆系统<span>保留来路，也保留改变的权利。</span></footer>
+<script type="module" src="./map.js"></script>
+</body></html>
