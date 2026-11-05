@@ -27,7 +27,7 @@ export type AcceptedMemory = {
   confidence: "low" | "medium" | "high";
 };
 
-export type RejectionCode = "invalid" | "quote_not_found" | "assistant_attribution";
+export type RejectionCode = "invalid" | "quote_not_found" | "assistant_attribution" | "ambiguous_quote" | "date_not_grounded";
 export type ValidationResult = { accepted: AcceptedMemory[]; rejected: Partial<Record<RejectionCode, number>> };
 
 const draftSchema = z.object({
@@ -83,12 +83,15 @@ export function validateMemoryDrafts(raw: unknown, conversation: { id: string; c
   const parsed = memoryResponseSchema.safeParse(raw);
   if (!parsed.success) {
     const count = Array.isArray((raw as { memories?: unknown })?.memories) ? (raw as { memories: unknown[] }).memories.length : 1;
-    return { accepted: [], rejected: { invalid: count } };
+    return { accepted: [], rejected: { invalid: Math.max(1, count) } };
   }
   const accepted: AcceptedMemory[] = [];
   for (const draft of parsed.data.memories) {
     const located = locateQuote(conversation.content, draft.quote);
     if (!located) { rejected.quote_not_found = (rejected.quote_not_found || 0) + 1; continue; }
+    const segments = roleSegments(conversation.content);
+    const matchingRoles = new Set(segments.filter(segment => locateQuote(segment.text, draft.quote)).map(segment => segment.role));
+    if (matchingRoles.size > 1) { rejected.ambiguous_quote = (rejected.ambiguous_quote || 0) + 1; continue; }
     const role = roleAt(conversation.content, located.start);
     if (roleSegments(conversation.content).some(segment => segment.start < located.end && segment.end > located.start && segment.role !== role)) {
       rejected.assistant_attribution = (rejected.assistant_attribution || 0) + 1; continue;
@@ -98,7 +101,16 @@ export function validateMemoryDrafts(raw: unknown, conversation: { id: string; c
       rejected.assistant_attribution = (rejected.assistant_attribution || 0) + 1;
       continue;
     }
-    const occurred = normalizeOccurred(draft.occurredAt);
+    let occurred = normalizeOccurred(draft.occurredAt);
+    if (occurred.occurredAt) {
+      const segment = segments.find(s => s.start <= located.start && s.end >= located.end)?.text || "";
+      const [year, month, day] = occurred.occurredAt.split("-");
+      const pattern = new RegExp(`(?<![0-9])${year}${month ? `(?:年|[-/])0?${Number(month)}${day ? `(?:月|[-/])0?${Number(day)}(?:日|号)?` : "(?:月)?"}` : "(?:年)?"}(?![0-9])`);
+      if (!pattern.test(segment)) {
+        occurred = { occurredAt: null, occurredPrecision: "unknown" };
+        rejected.date_not_grounded = (rejected.date_not_grounded || 0) + 1;
+      }
+    }
     const memory: MemoryDraft = {
       kind: draft.kind,
       statement: draft.statement,
@@ -127,5 +139,7 @@ export function describeRejections(rejected: Partial<Record<RejectionCode, numbe
   if (rejected.quote_not_found) parts.push(`${rejected.quote_not_found} 条引文在原文中找不到`);
   if (rejected.assistant_attribution) parts.push(`${rejected.assistant_attribution} 条把 AI 的说法写成了你的`);
   if (rejected.invalid) parts.push(`${rejected.invalid} 条格式不完整`);
+  if (rejected.ambiguous_quote) parts.push(`${rejected.ambiguous_quote} 条引文跨说话人重复，无法可靠归属`);
+  if (rejected.date_not_grounded) parts.push(`${rejected.date_not_grounded} 条日期缺少原文支持，已留空`);
   return parts.join("，");
 }

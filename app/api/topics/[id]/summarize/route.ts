@@ -1,12 +1,14 @@
+import { modelApi } from "@/lib/model-operation";
+import { upstreamJson } from "@/lib/upstream-json";
 import { z } from "zod";
-import { api, body, context, json, ownedTopic, runtime, conversationSQL, ApiError } from "@/lib/server";
+import { body, context, json, ownedTopic, runtime, conversationSQL, ApiError } from "@/lib/server";
 import { currentWeek, inImportWeek, summaryInput, SUMMARY_SYSTEM, validateSummary } from "@/lib/summary";
 import type { Conversation } from "@/lib/types";
 import { providerIds } from "@/lib/providers";
 import { resolveModelConfig, buildModelRequest, ModelConfigurationError } from "@/lib/model-config";
 import { modelIdentity } from "@/lib/model-response";
 
-export const POST = api(async (request: Request, route: { params: Promise<{ id: string }> }) => {
+export const POST = modelApi(async (request: Request, route: { params: Promise<{ id: string }> }) => {
   const { db, ownerId } = await context(); const { id } = await route.params;
   const topic = await ownedTopic(db, ownerId, id);
   const parsed = z.object({ kind: z.enum(["topic", "week"]).default("topic"), weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), provider: z.enum(providerIds).optional(), apiKey: z.string().max(500).optional(), model: z.string().trim().min(1).max(100).optional() }).strict().safeParse(await body(request));
@@ -40,7 +42,7 @@ export const POST = api(async (request: Request, route: { params: Promise<{ id: 
   let summary;
   let modelInfo;
   try {
-    const completion = await upstream.json() as { model?: unknown; choices?: { message?: { content?: string }; finish_reason?: string }[] };
+    const completion = await upstreamJson(upstream) as { model?: unknown; choices?: { message?: { content?: string }; finish_reason?: string }[] };
     modelInfo = modelIdentity(requestedModel, completion.model);
     if (completion.choices?.[0]?.finish_reason === "length") throw new Error();
     const text = completion.choices?.[0]?.message?.content;

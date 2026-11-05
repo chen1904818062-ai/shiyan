@@ -1,10 +1,16 @@
-// 归并：同一条记忆被多次提及时只保留一条，证据累积。
-// 用归一化陈述作为键，避免「换一种说法就变成两条记忆」。
+// 仅对等价格式去重，不判断不同措辞是否同义。
+// 日期、说话人和逐条证据必须保留。
 
-const PUNCTUATION = /[\s，。、；：！？,.;:!?、"“”‘’（）()《》〈〉【】\[\]{}—–…·~`@#$%^&*+=|\\/<>]/g;
+// Keep semantic characters: 3.5 != 35, C++ != C, and positive != negative.
+// This exact character set is also used by migration 0003.
+export const KEY_IGNORED = " \t\r\n\u3000\u00a0，。、；：,;:\"“”‘’（）()《》〈〉【】[]{}…·";
 
 export function statementKey(statement: string) {
-  return statement.replace(PUNCTUATION, "").toLowerCase().slice(0, 200);
+  return [...statement].filter(char => !KEY_IGNORED.includes(char)).join("").replace(/[A-Z]/g, char => char.toLowerCase());
+}
+
+export function memoryIdentityKey(statement: string, occurredAt: string | null, role: string) {
+  return `${statementKey(statement)}|date:${occurredAt || ""}|role:${role}`;
 }
 
 type DraftLike = {
@@ -19,16 +25,12 @@ type DraftLike = {
 export function mergeDrafts<T extends { draft: DraftLike }>(items: T[]): T[] {
   const seen = new Map<string, T>();
   for (const item of items) {
-    const key = `${item.draft.kind}|${statementKey(item.draft.statement)}`;
+    // Deduplicate identical evidence only. Never attach another quote's detail
+    // or date to a span that did not support it.
+    const key = JSON.stringify(item);
     const previous = seen.get(key);
     if (!previous) { seen.set(key, item); continue; }
-    const merged: T = { ...previous, draft: { ...previous.draft } };
-    if (item.draft.detail.length > previous.draft.detail.length) merged.draft.detail = item.draft.detail;
-    if (item.draft.occurredAt && (!merged.draft.occurredAt || item.draft.occurredAt < merged.draft.occurredAt)) {
-      merged.draft.occurredAt = item.draft.occurredAt;
-      merged.draft.occurredPrecision = item.draft.occurredPrecision;
-    }
-    seen.set(key, merged);
+    seen.set(key, previous);
   }
   return [...seen.values()];
 }

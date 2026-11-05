@@ -1,0 +1,20 @@
+{
+  "syntheticOnly": true,
+  "realModelCalls": 0,
+  "diagnostics": [
+    {
+      "id": "SEM-01",
+      "test": "unsupported statement with a real quote",
+      "structuralValidatorAccepted": true,
+      "mitigation": "candidate status and explicit human confirmation",
+      "remaining": "statement/quote entailment is not verified"
+    },
+    {
+      "id": "SEM-02",
+      "test": "unsupported answer with a real citation ID",
+      "structuralValidatorAccepted": true,
+      "mitigation": "source UI and constrained context",
+      "remaining": "answer/evidence entailment is not verified"
+    }
+  ]
+}

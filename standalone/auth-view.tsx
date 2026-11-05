@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { APP_VERSION } from "../lib/version";
 
 type Channel = "email" | "phone";
 export type AuthConfig = { channels: Channel[]; identities?: { channel: Channel; address: string }[]; owner?: boolean; publicEnabled?: boolean; setup?: { name: string; configured: boolean }[] };
 type Challenge = { challengeId: string; destination: string; resendAt: number; expiresAt: number; code: string };
 type Action = "sending" | "verifying" | "redirecting" | null;
+const subscribeReady = () => () => {};
 const canonical = (channel: Channel, address: string) => `${channel}:${channel === "email" ? address.trim().toLowerCase() : address.replace(/[\s-]/g, "").replace(/^\+86/, "")}`;
 
 async function api<T>(path: string, data?: unknown, signal?: AbortSignal): Promise<T> {
@@ -26,7 +27,7 @@ export default function Auth({ account, initialConfig }: { account: boolean; ini
   const [records, setRecords] = useState<Record<string, Challenge>>({});
   const [editing, setEditing] = useState(false);
   const [action, setAction] = useState<Action>(null);
-  const [interactive, setInteractive] = useState(false);
+  const interactive = useSyncExternalStore(subscribeReady, () => true, () => false);
   const [now, setNow] = useState(0);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -46,20 +47,19 @@ export default function Auth({ account, initialConfig }: { account: boolean; ini
   const available = config.channels.includes(channel);
   const busy = action !== null;
 
-  useEffect(() => { setInteractive(true); return () => { mounted.current = false; request.current?.abort(); }; }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; request.current?.abort(); }; }, []);
   const lastDeadline = Math.max(0, ...Object.values(records).map(record => record.expiresAt));
   useEffect(() => {
     if (!lastDeadline) return;
     const timer = setInterval(() => { const time = Date.now(); setNow(time); if (time >= lastDeadline) clearInterval(timer); }, 1000);
     const update = () => setNow(Date.now());
-    update(); document.addEventListener("visibilitychange", update);
-    if (lastDeadline <= Date.now()) clearInterval(timer);
+    document.addEventListener("visibilitychange", update);
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", update); };
   }, [lastDeadline]);
   useEffect(() => { if (hasChallenge && available && !linked) codeRef.current?.focus(); }, [channel, challenge?.challengeId, hasChallenge, available, linked]);
 
   function changeChannel(next: Channel) {
-    setChannel(next); setEditing(false); setError(""); setMessage(""); setNow(Date.now());
+    setChannel(next); setEditing(false); setError(""); setMessage("");
   }
   function updateCode(value: string) {
     setRecords(current => ({ ...current, [key]: { ...current[key], code: value.normalize("NFKC").replace(/\D/g, "").slice(0, 6) } }));

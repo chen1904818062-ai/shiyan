@@ -1,4 +1,4 @@
-import { sqliteTable, text, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const topics = sqliteTable("topics", {
   id: text("id").primaryKey(),
@@ -98,4 +98,10 @@ export const memoryExtractions = sqliteTable("memory_extractions", {
   conversationId: text("conversation_id").primaryKey().references(() => conversations.id, {onDelete:"cascade"}),
   ownerId: text("owner_id").notNull(),
   extractedAt: text("extracted_at").notNull(),
+});
+
+export const modelOperations = sqliteTable("model_operations", {
+  ownerId: text("owner_id").primaryKey(),
+  token: text("token").notNull(),
+  expiresAt: integer("expires_at").notNull(),
 });

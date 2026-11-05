@@ -57,7 +57,10 @@ test('memory lifecycle, isolation, extraction, recall, correction and backup',as
  await t.test('withdrawals during an upstream call reject stale answers',async()=>{
   const waiting=new Promise(done=>{const listener=m=>{if(m.type==='recall-waiting'){server.off('message',listener);done();}};server.on('message',listener);});
   const request=call('/api/memories/ask',{question:'产品实习',...model,apiKey:'test-race'});await waiting;
+  await expect('/api/memories/ask',{question:'产品实习',...model},429);
+  await expect('/api/memories/ask',{question:'产品实习',...model},422,'bob');
   await expect('/api/memories/'+first.id,{action:'retract'},200,'alice','PATCH');assert.equal((await request).status,409);
+  await expect('/api/memories/ask',{question:'产品实习',...model},422);
  });
  await t.test('extraction rejects fabricated quotes and AI attribution; completed empty results are not retried',async()=>{
   topic=(await expect('/api/topics',{title:'记忆测试虚构资料'},201)).topic.id;

@@ -22,6 +22,13 @@
       "when": 1793775638685,
       "tag": "0002_memory_runtime",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793877427084,
+      "tag": "0003_memory_integrity",
+      "breakpoints": true
     }
   ]
 }

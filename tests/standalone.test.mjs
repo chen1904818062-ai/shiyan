@@ -5,6 +5,7 @@ import { mkdtemp, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { openDatabase, migrate } from "../standalone/database.ts";
+import { APP_VERSION } from "../lib/version.ts";
 
 await mkdir(".sites-runtime", { recursive: true });
 const directory = await mkdtemp(resolve(".sites-runtime", "standalone-test-"));
@@ -22,7 +23,7 @@ test("SQL adapter preserves atomic batches, changes counts and migration history
       insert,
     ]));
     assert.equal(await db.prepare("SELECT id FROM topics WHERE id = ?").bind("two").first(), null);
-    assert.equal((await db.prepare("SELECT name FROM shiyan_migrations").all()).results.length, 5);
+    assert.equal((await db.prepare("SELECT name FROM shiyan_migrations").all()).results.length, 6);
   } finally { client.close(); }
 });
 
@@ -50,7 +51,7 @@ test("standalone server protects private data, persists originals and survives r
   try {
     const health = await fetch(base + "/healthz");
     assert.equal(health.status, 200);
-    assert.deepEqual(await health.json(), { status: "ok", application: "shiyan", version: "1.3.0" });
+    assert.deepEqual(await health.json(), { status: "ok", application: "shiyan", version: APP_VERSION });
     assert.equal((await fetch(base + "/api/topics")).status, 401);
     assert.equal((await fetch(base + "/api/topics", { headers: { "oai-authenticated-user-id": "shiyan-private-owner", "oai-authenticated-user-email": "fake@test.invalid" } })).status, 401);
     assert.equal((await fetch(base + "/", { redirect: "manual" })).headers.get("location"), "/login");

@@ -1,6 +1,7 @@
 import type { AcceptedMemory } from "./validate.ts";
 import { scoreConfidence, spanDays } from "./confidence.ts";
-import { statementKey } from "./merge.ts";
+import { memoryIdentityKey } from "./merge.ts";
+import { recallTerms } from "./recall.ts";
 import type { MemoryEvidenceRecord, MemoryRecord, MemoryStats } from "./types.ts";
 
 type MemoryRow = {
@@ -37,6 +38,7 @@ type EvidenceRow = {
 
 export type ListOptions = {
   id?: string;
+  ids?: string[];
   kinds?: string[];
   status?: string;
   topicId?: string;
@@ -72,20 +74,22 @@ export async function listMemories(db: D1Database, ownerId: string, options: Lis
   const where = ["m.owner_id = ?", "t.owner_id = ?"];
   const binds: unknown[] = [ownerId, ownerId];
   if (options.id) { where.push("m.id = ?"); binds.push(options.id); }
+  if (options.ids) { where.push("m.id IN (SELECT value FROM json_each(?))"); binds.push(JSON.stringify(options.ids)); }
   if (options.kinds?.length) { where.push("m.kind IN (SELECT value FROM json_each(?))"); binds.push(JSON.stringify(options.kinds)); }
   if (options.status) { where.push("m.status = ?"); binds.push(options.status); }
   if (options.topicId) { where.push("c.topic_id = ?"); binds.push(options.topicId); }
   if (options.q) { where.push("(m.statement LIKE ? OR m.detail LIKE ?)"); binds.push(`%${options.q}%`, `%${options.q}%`); }
   const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
   const offset = Math.max(options.offset ?? 0, 0);
-  const sql = `${MEMORY_SELECT} WHERE ${where.join(" AND ")} ORDER BY COALESCE(m.occurred_at, m.created_at) DESC, m.created_at DESC LIMIT ? OFFSET ?`;
+  const sql = `${MEMORY_SELECT} WHERE ${where.join(" AND ")} ORDER BY m.created_at DESC, m.id DESC LIMIT ? OFFSET ?`;
   const { results } = await db.prepare(sql).bind(...binds, limit, offset).all<MemoryRow>();
   if (!results.length) return [];
   const evidence = await db.prepare(`SELECT e.id, e.memory_id AS memoryId, e.conversation_id AS conversationId, e.quote,
     e.char_start AS charStart, e.char_end AS charEnd, e.speaker_role AS speakerRole, c.title AS conversationTitle
     FROM memory_evidence e INNER JOIN conversations c ON c.id = e.conversation_id
-    WHERE e.memory_id IN (SELECT value FROM json_each(?)) ORDER BY e.created_at ASC`)
-    .bind(JSON.stringify(results.map(row => row.id))).all<EvidenceRow>();
+    INNER JOIN topics et ON et.id = c.topic_id
+    WHERE et.owner_id = ? AND e.memory_id IN (SELECT value FROM json_each(?)) ORDER BY e.created_at ASC, e.id ASC`)
+    .bind(ownerId, JSON.stringify(results.map(row => row.id))).all<EvidenceRow>();
   const grouped = new Map<string, MemoryEvidenceRecord[]>();
   for (const row of evidence.results) {
     const item: MemoryEvidenceRecord = {
@@ -102,6 +106,23 @@ export async function listMemories(db: D1Database, ownerId: string, options: Lis
     grouped.set(row.memoryId, list);
   }
   return results.map(row => toRecord(row, grouped.get(row.id) || []));
+}
+
+// Rank the entire authorized corpus in SQL before loading evidence. No silent
+// newest-500 cutoff and no unrelated fallback. This is lexical, not semantic.
+export async function searchMemories(db: D1Database, ownerId: string, question: string, includePrivate: boolean) {
+  const terms = JSON.stringify(recallTerms(question));
+  const permission = "m.owner_id=? AND t.owner_id=? AND m.status='confirmed' AND (?=1 OR m.sensitivity='normal')";
+  const args = [ownerId, ownerId, includePrivate ? 1 : 0];
+  const count = await db.prepare(`SELECT COUNT(*) AS n FROM memories m INNER JOIN conversations c ON c.id=m.source_conversation_id INNER JOIN topics t ON t.id=c.topic_id WHERE ${permission}`).bind(...args).first<{n:number}>();
+  const rows = await db.prepare(`SELECT m.id,
+    (SELECT COALESCE(SUM(CASE WHEN instr(lower(m.statement),value)>0 THEN 3 ELSE 0 END + CASE WHEN instr(lower(m.detail || ' ' || t.title),value)>0 THEN 1 ELSE 0 END),0) FROM json_each(?)) AS score
+    FROM memories m INNER JOIN conversations c ON c.id=m.source_conversation_id INNER JOIN topics t ON t.id=c.topic_id
+    WHERE ${permission} AND EXISTS (SELECT 1 FROM json_each(?) WHERE instr(lower(m.statement || ' ' || m.detail || ' ' || t.title),value)>0)
+    ORDER BY score DESC, m.updated_at DESC, m.id DESC LIMIT 24`).bind(terms,...args,terms).all<{id:string;score:number}>();
+  const memories = await listMemories(db,ownerId,{ids:rows.results.map(r=>r.id),status:"confirmed",limit:24});
+  const selected = rows.results.flatMap(row => memories.filter(m=>m.id===row.id && (includePrivate || m.sensitivity==='normal')));
+  return { selected, matched: selected.length>0, eligible: Number(count?.n || 0) };
 }
 
 export async function memoryStats(db: D1Database, ownerId: string): Promise<MemoryStats> {
@@ -125,16 +146,16 @@ export async function memoryStats(db: D1Database, ownerId: string): Promise<Memo
 
 export async function refreshConfidence(db: D1Database, ownerId: string, ids: string[]) {
   for (const id of new Set(ids)) {
-    const row = await db.prepare(`SELECT COUNT(*) AS n, COUNT(DISTINCT e.conversation_id) AS c,
-      MIN(COALESCE(conv.conversation_date, m.occurred_at, conv.imported_at)) AS firstAt,
-      MAX(COALESCE(conv.conversation_date, m.occurred_at, conv.imported_at)) AS lastAt,
-      m.basis AS basis, m.status AS status
+    const row = await db.prepare(`SELECT COUNT(*) AS n, COUNT(DISTINCT conv.content_hash) AS c,
+      MIN(conv.conversation_date) AS firstAt,
+      MAX(conv.conversation_date) AS lastAt,
+      m.basis AS basis, m.status AS status, m.source_role AS sourceRole
       FROM memory_evidence e INNER JOIN memories m ON m.id = e.memory_id
       INNER JOIN conversations conv ON conv.id = e.conversation_id
       WHERE e.memory_id = ? AND m.owner_id = ?`).bind(id, ownerId)
-      .first<{ n: number; c: number; firstAt: string | null; lastAt: string | null; basis: string; status: string }>();
+      .first<{ n: number; c: number; firstAt: string | null; lastAt: string | null; basis: string; status: string; sourceRole: string }>();
     if (!row) continue;
-    const confidence = scoreConfidence({
+    const confidence = row.sourceRole === "unknown" && row.status !== "confirmed" ? "low" : scoreConfidence({
       evidenceCount: Number(row.n),
       distinctConversations: Number(row.c),
       spanDays: spanDays(row.firstAt, row.lastAt),
@@ -155,18 +176,28 @@ export async function saveAcceptedMemories(db: D1Database, ownerId: string, item
   const touched: string[] = [];
   for (const item of items) {
     const id = crypto.randomUUID();
+    const key = memoryIdentityKey(item.draft.statement,item.draft.occurredAt,item.role);
     const results = await db.batch([
       db.prepare(`INSERT OR IGNORE INTO memories (id, owner_id, kind, statement, statement_key, detail, occurred_at, occurred_precision, basis, confidence, status, sensitivity, source_conversation_id, source_role, created_at, updated_at)
         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'candidate', ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM conversations c INNER JOIN topics t ON t.id=c.topic_id WHERE c.id=? AND t.owner_id=?)`)
-        .bind(id, ownerId, item.draft.kind, item.draft.statement, statementKey(item.draft.statement), item.draft.detail, item.draft.occurredAt, item.draft.occurredPrecision, item.draft.basis, item.confidence, item.draft.sensitivity, item.conversationId, item.role, now, now,item.conversationId,ownerId),
+        .bind(id, ownerId, item.draft.kind, item.draft.statement, key, item.draft.detail, item.draft.occurredAt, item.draft.occurredPrecision, item.draft.basis, item.confidence, item.draft.sensitivity, item.conversationId, item.role, now, now,item.conversationId,ownerId),
+      db.prepare(`INSERT INTO memory_revisions (id,memory_id,before_json,after_json,reason,created_at)
+        SELECT ?,m.id,json_object('statement',m.statement,'detail',m.detail,'status',m.status,'sensitivity',m.sensitivity),json_object('statement',m.statement,'detail',m.detail,'status','candidate'), '新增证据，需重新确认',?
+        FROM memories m WHERE m.owner_id=? AND m.kind=? AND m.statement_key=? AND m.status='confirmed'
+        AND EXISTS (SELECT 1 FROM conversations c INNER JOIN topics t ON t.id=c.topic_id WHERE c.id=? AND t.owner_id=?)
+        AND NOT EXISTS (SELECT 1 FROM memory_evidence e WHERE e.memory_id=m.id AND e.conversation_id=? AND e.quote=?)`)
+        .bind(crypto.randomUUID(),now,ownerId,item.draft.kind,key,item.conversationId,ownerId,item.conversationId,item.draft.quote),
+      db.prepare(`UPDATE memories SET status=CASE WHEN status='confirmed' AND NOT EXISTS (SELECT 1 FROM memory_evidence e WHERE e.memory_id=memories.id AND e.conversation_id=? AND e.quote=?) THEN 'candidate' ELSE status END,
+        sensitivity=CASE WHEN sensitivity='sensitive' OR ?='sensitive' THEN 'sensitive' WHEN sensitivity='private' OR ?='private' THEN 'private' ELSE 'normal' END,updated_at=?
+        WHERE owner_id=? AND kind=? AND statement_key=? AND EXISTS (SELECT 1 FROM conversations c INNER JOIN topics t ON t.id=c.topic_id WHERE c.id=? AND t.owner_id=?)`)
+        .bind(item.conversationId,item.draft.quote,item.draft.sensitivity,item.draft.sensitivity,now,ownerId,item.draft.kind,key,item.conversationId,ownerId),
       db.prepare(`INSERT INTO memory_evidence (id, memory_id, conversation_id, quote, char_start, char_end, speaker_role, created_at)
         SELECT ?, m.id, ?, ?, ?, ?, ?, ? FROM memories m WHERE m.owner_id=? AND m.kind=? AND m.statement_key=?
         AND EXISTS (SELECT 1 FROM conversations c INNER JOIN topics t ON t.id=c.topic_id WHERE c.id=? AND t.owner_id=?)
         AND NOT EXISTS (SELECT 1 FROM memory_evidence e WHERE e.memory_id=m.id AND e.conversation_id=? AND e.quote=?)`)
-        .bind(crypto.randomUUID(), item.conversationId, item.draft.quote, String(item.start), String(item.end), item.role, now,ownerId,item.draft.kind,statementKey(item.draft.statement),item.conversationId,ownerId,item.conversationId,item.draft.quote),
+        .bind(crypto.randomUUID(), item.conversationId, item.draft.quote, String(item.start), String(item.end), item.role, now,ownerId,item.draft.kind,key,item.conversationId,ownerId,item.conversationId,item.draft.quote),
     ]);
-    if (item.draft.sensitivity !== "normal") await db.prepare("UPDATE memories SET sensitivity = ?, updated_at = ? WHERE owner_id=? AND kind=? AND statement_key=? AND sensitivity='normal'").bind(item.draft.sensitivity,now,ownerId,item.draft.kind,statementKey(item.draft.statement)).run();
-    const memory = await db.prepare("SELECT id FROM memories WHERE owner_id=? AND kind=? AND statement_key=?").bind(ownerId,item.draft.kind,statementKey(item.draft.statement)).first<{id:string}>();
+    const memory = await db.prepare("SELECT id FROM memories WHERE owner_id=? AND kind=? AND statement_key=?").bind(ownerId,item.draft.kind,key).first<{id:string}>();
     if (memory) touched.push(memory.id);
     if (results[0].meta.changes) created++; else if (memory) merged++;
   }

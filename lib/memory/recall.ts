@@ -1,18 +1,23 @@
 import { z } from "zod";
 import type { MemoryRecord } from "./types.ts";
 
-export function recallMemories(memories: MemoryRecord[], question: string, includePrivate = false) {
+export function recallTerms(question: string) {
   const terms = new Set<string>();
   const normalized = question.toLowerCase();
   for (const word of normalized.match(/[a-z0-9]{2,}|[\p{Script=Han}]+/gu) || []) {
     if (/^[a-z0-9]/.test(word)) terms.add(word);
     else for (let i = 0; i < word.length - 1; i++) terms.add(word.slice(i, i + 2));
   }
+  return [...terms].slice(0, 64);
+}
+
+export function recallMemories(memories: MemoryRecord[], question: string, includePrivate = false) {
+  const terms = recallTerms(question);
   const ranked = memories.filter(m => m.status === "confirmed" && (includePrivate || m.sensitivity === "normal"))
     .map(memory => ({ memory, score: [...terms].reduce((score, term) => score + (memory.statement.toLowerCase().includes(term) ? 3 : 0) + (`${memory.detail} ${memory.topicTitle}`.toLowerCase().includes(term) ? 1 : 0), 0) }))
     .sort((a, b) => b.score - a.score || b.memory.updatedAt.localeCompare(a.memory.updatedAt));
   const matches = ranked.filter(item => item.score > 0);
-  const selected = (matches.length ? matches : ranked).slice(0, 24).map(item => item.memory);
+  const selected = matches.slice(0, 24).map(item => item.memory);
   return { selected, matched: matches.length > 0, eligible: ranked.length };
 }
 
@@ -23,8 +28,9 @@ export const recallResponseSchema = z.object({
   steps: z.array(point.extend({ check: z.string().trim().min(1).max(500) })).max(8),
 }).strict();
 export type RecallResponse = z.infer<typeof recallResponseSchema>;
-export function validateRecall(value: unknown, memories: MemoryRecord[]) {
+export function validateRecall(value: unknown, memories: MemoryRecord[], mode?: "recall" | "plan") {
   const parsed = recallResponseSchema.parse(value);
+  if (mode === "recall" && parsed.steps.length) throw new Error("Unexpected plan in recall mode");
   const ids = new Set(memories.map(m => m.id));
   for (const item of [...parsed.answer, ...parsed.steps]) if (item.memoryIds.some(id => !ids.has(id))) throw new Error("Invalid memory reference");
   return parsed;
