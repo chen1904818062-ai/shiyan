@@ -1,3 +1,4 @@
+import {APP_VERSION} from "../lib/version.ts";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
@@ -24,10 +25,10 @@ function wire(path, accept) {
 try {
   await new Promise((ready, fail) => { const timer = setTimeout(() => fail(new Error("Server startup timeout")), 15_000); server.stdout.on("data", value => { if (String(value).includes("listening")) { clearTimeout(timer); ready(); } }); server.once("exit", code => { clearTimeout(timer); fail(new Error("Server exited " + code)); }); });
   const html = await (await fetch(base + "/login")).text();
-  assert.match(html, /aria-label="邮箱地址"/); assert.match(html, /assets\/auth.css\?v=1.3.0/); assert.ok(!html.includes("正在读取登录方式")); assert.ok(!html.includes("test-only"));
-  const raw = await wire("/assets/auth.js?v=1.3.0", "identity");
-  const br = await wire("/assets/auth.js?v=1.3.0", "br, gzip");
-  const gz = await wire("/assets/auth.js?v=1.3.0", "br;q=0, gzip;q=1");
+  assert.match(html, /aria-label="邮箱地址"/); assert.ok(html.includes(`/assets/auth.css?v=${APP_VERSION}`)); assert.ok(!html.includes("正在读取登录方式")); assert.ok(!html.includes("test-only"));
+  const raw = await wire(`/assets/auth.js?v=${APP_VERSION}`, "identity");
+  const br = await wire(`/assets/auth.js?v=${APP_VERSION}`, "br, gzip");
+  const gz = await wire(`/assets/auth.js?v=${APP_VERSION}`, "br;q=0, gzip;q=1");
   const plain = await wire("/assets/auth.js", "br;q=0,gzip;q=0");
   assert.equal(br.headers["content-encoding"], "br"); assert.equal(gz.headers["content-encoding"], "gzip"); assert.equal(plain.headers["content-encoding"], undefined);
   assert.deepEqual(brotliDecompressSync(br.body), raw.body); assert.deepEqual(gunzipSync(gz.body), raw.body); assert.equal(br.headers.vary, "Accept-Encoding");
@@ -103,6 +104,7 @@ try {
   assert.equal(await phone.getByRole("button", { name: "登录 / 注册", exact: true }).isDisabled(), true);
   await phone.route("**/api/auth/send", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ challengeId: "test-refreshed", destination: "ex***@example.com", retryAfter: 60, expiresIn: 300 }) }));
   await phone.getByRole("button", { name: "重新发送验证码", exact: true }).click();
+  await phone.waitForFunction(() => document.querySelector('input[name="code"]')?.value === "" && [...document.querySelectorAll("button")].some(button => /秒后可重发/.test(button.textContent)));
   assert.equal(await phone.getByLabel("验证码", { exact: true }).inputValue(), "");
   assert.equal(await phone.getByRole("button", { name: /秒后可重发/ }).isDisabled(), true);
   assert.equal(await phone.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);

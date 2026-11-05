@@ -63,7 +63,7 @@ try {
   await page.getByRole("button", { name: "获取验证码", exact: true }).click();
   await page.getByLabel("验证码", { exact: true }).fill(await received("+8613800138000"));
   await page.getByRole("button", { name: "验证并绑定", exact: true }).click();
-  await page.getByText("+86138****8000", { exact: true }).waitFor();
+  await page.locator(".account-identities").getByText("+86138****8000", { exact: true }).waitFor();
   assert.equal(await page.locator(".account-identities li").count(), 2);
   assert.equal(await page.getByText("管理员：登录服务配置", { exact: true }).count(), 0);
   await page.screenshot({ path: ".sites-runtime/screenshots/accounts-linked-desktop.png", fullPage: true });

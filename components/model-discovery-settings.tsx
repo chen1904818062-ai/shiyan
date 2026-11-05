@@ -13,25 +13,23 @@ export default function ModelSettings({ selectedProvider, choices, serverModel, 
   const [manual, setManual] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const latest = useRef({ provider, key: "" });
   const sequence = useRef(0);
   const abort = useRef<AbortController | null>(null);
   const definition = providers[provider];
   const choice = drafts[provider] || defaultChoice(provider);
-  latest.current = { provider, key: choice.apiKey };
   useEffect(() => () => { sequence.current++; abort.current?.abort(); }, []);
   function invalidate() { sequence.current++; abort.current?.abort(); setLoading(false); setError(""); }
   function update(patch: Partial<typeof choice>) { setDrafts(old => ({ ...old, [provider]: { ...(old[provider] || defaultChoice(provider)), ...patch } })); }
   async function readModels() {
     const apiKey = choice.apiKey.trim(); if (!apiKey) { setError("请先填写 API Key。"); return; }
     abort.current?.abort(); const controller = new AbortController(); abort.current = controller;
-    const id = ++sequence.current; const requestedProvider = provider; const originalKey = choice.apiKey;
+    const id = ++sequence.current; const requestedProvider = provider;
     setLoading(true); setError("");
     try {
       const response = await fetch("/api/model/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: requestedProvider, apiKey }), cache: "no-store", signal: controller.signal });
       const data = await response.json() as { models?: DiscoveredModel[]; error?: string };
       if (!response.ok || !data.models?.length) throw new Error(data.error || "平台没有返回可用的模型列表。");
-      if (id !== sequence.current || latest.current.provider !== requestedProvider || latest.current.key !== originalKey) return;
+      if (id !== sequence.current) return;
       const models = data.models;
       setDrafts(old => {
         const current = old[requestedProvider] || defaultChoice(requestedProvider);

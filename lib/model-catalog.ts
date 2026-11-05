@@ -1,3 +1,4 @@
+import { upstreamJson } from "./upstream-json.ts";
 import { providers, type ProviderId, type DiscoveredModel } from "./providers.ts";
 
 export class ModelCatalogError extends Error {
@@ -34,9 +35,7 @@ export async function discoverModels(provider: ProviderId, apiKey: string, fetch
     throw new ModelCatalogError(message, response.status === 401 || response.status === 403 ? response.status : 502);
   }
   try {
-    const text = await response.text();
-    if (text.length > 2_000_000) throw new Error();
-    return parseModelCatalog(JSON.parse(text));
+    return parseModelCatalog(await upstreamJson(response, 2_000_000));
   } catch (error) {
     if (error instanceof ModelCatalogError) throw error;
     throw new ModelCatalogError("平台返回的模型列表格式不正确，请稍后重试。");

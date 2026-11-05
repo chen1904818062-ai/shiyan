@@ -9,14 +9,14 @@ export type ConfidenceInput = {
 };
 
 // 置信度用可计算指标得出，不由模型自评。
-// 规则：确认即高；三条以上独立证据且跨半年为高；两条以上且跨来源或跨月为中；其余为低。
+// 规则：用户确认即高；三份以上独立原文且跨半年为高；两份以上独立原文为中。
 // 推断类记忆最高只能到中，避免模型推断被当成事实。
 export function scoreConfidence(input: ConfidenceInput): ConfidenceLevel {
   if (input.confirmed) return "high";
   if (input.evidenceCount <= 0) return "low";
   const inferred = input.basis === "inferred";
-  if (!inferred && input.evidenceCount >= 3 && input.spanDays >= 180) return "high";
-  if (input.evidenceCount >= 2 && (input.distinctConversations >= 2 || input.spanDays >= 30)) return "medium";
+  if (!inferred && input.distinctConversations >= 3 && input.spanDays >= 180) return "high";
+  if (input.distinctConversations >= 2) return "medium";
   return "low";
 }
 

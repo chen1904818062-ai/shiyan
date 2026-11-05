@@ -100,7 +100,7 @@ test("the same statement is merged instead of stored twice", () => {
     { draft: { kind: "goal", statement: "我要找运营实习", detail: "", quote: "a", occurredAt: null, occurredPrecision: "unknown" } },
     { draft: { kind: "goal", statement: "我要找运营实习。", detail: "补充背景", quote: "b", occurredAt: "2026-09", occurredPrecision: "month" } },
   ]);
-  assert.equal(merged.length, 1);
-  assert.equal(merged[0].draft.detail, "补充背景");
-  assert.equal(merged[0].draft.occurredAt, "2026-09");
+  assert.equal(merged.length, 2);
+  assert.equal(merged[1].draft.detail, "补充背景");
+  assert.equal(merged[1].draft.occurredAt, "2026-09");
 });

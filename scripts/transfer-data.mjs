@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { openDatabase, migrate } from "../standalone/database.ts";
+import { memoryIdentityKey } from "../lib/memory/merge.ts";
 
 const [operation, filename] = process.argv.slice(2);
 if (!["export", "import"].includes(operation) || !filename?.endsWith(".json")) throw new Error("Usage: node scripts/transfer-data.mjs export|import /absolute/path/backup.json");
@@ -20,8 +21,10 @@ const { client } = openDatabase();
 try {
   if (operation === "export") {
     const data = { version: 3, exportedAt: new Date().toISOString(), tables: {} };
-    for (const [table, columns] of Object.entries(tables)) {
-      const result = await client.execute(`SELECT ${columns.join(",")} FROM ${table} ORDER BY ${columns[0]}`);
+    const entries = Object.entries(tables);
+    const snapshots = await client.batch(entries.map(([table, columns]) => ({sql:`SELECT ${columns.join(",")} FROM ${table} ORDER BY ${columns[0]}`,args:[]})), "write");
+    for (const [index, [table, columns]] of entries.entries()) {
+      const result = snapshots[index];
       data.tables[table] = result.rows.map(row => Object.fromEntries(columns.map(column => [column, row[column]])));
     }
     await writeFile(path.resolve(filename), JSON.stringify(data, null, 2), { encoding: "utf8", flag: "wx", mode: 0o600 });
@@ -42,6 +45,7 @@ try {
       if (Number(existing.rows[0].count)) throw new Error("Target database is not empty; import refused");
       for (const row of data.tables[table]) {
         if (!row || columns.some(column => !Object.hasOwn(row, column) || (table.startsWith("shiyan_") && ["created_at", "verified_at"].includes(column) ? !Number.isSafeInteger(row[column]) : row[column] !== null && typeof row[column] !== "string"))) throw new Error("Invalid backup row");
+        if (table === "memories") row.statement_key = memoryIdentityKey(row.statement, row.occurred_at, row.source_role);
         statements.push({ sql: `INSERT INTO ${table} (${columns.join(",")}) VALUES (${columns.map(() => "?").join(",")})`, args: columns.map(column => row[column]) });
       }
     }

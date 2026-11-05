@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type FormEvent } from "react";
-import { ArrowUpRight, ArrowLeft, ArrowRight, ArrowDownToLine, Plus, Search, BookOpen, CalendarDays, Settings2, MessageSquare, Sparkles, ChevronRight, ChevronLeft, X, Check, LoaderCircle, FileText, Leaf, MoreHorizontal, Link2, Trash2, Clock3, CircleHelp, LogOut, Menu, Send, Copy, AlertCircle, GraduationCap, FolderOpen, Brain } from "lucide-react";
+import { ArrowUpRight, ArrowLeft, ArrowRight, ArrowDownToLine, Plus, Search, BookOpen, CalendarDays, Settings2, MessageSquare, Sparkles, ChevronRight, ChevronLeft, X, Check, LoaderCircle, FileText, Leaf, Link2, Trash2, Clock3, CircleHelp, LogOut, Menu, Copy, AlertCircle, GraduationCap, FolderOpen, Brain } from "lucide-react";
 import type { Conversation, Topic, TopicDetail, Report, SummaryItem, Source } from "@/lib/types";
 import { currentWeek, inImportWeek, chinaDate } from "@/lib/summary";
 import { demo as demoData } from "@/lib/demo";
@@ -76,7 +76,7 @@ export default function Workspace({ displayName, accountEnabled = false }: { dis
   const [originalSearch, setOriginalSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("全部");
   const activeRef = useRef<string | null>(null);
-  activeRef.current = selected;
+  useEffect(() => { activeRef.current = selected; }, [selected]);
 
   const refreshTopics = useCallback(async () => { const data = await api<{ topics: Topic[] }>("/api/topics"); setTopics(data.topics); }, []);
   const reloadDetail = useCallback(async (id: string) => { const data = await api<TopicDetail>(`/api/topics/${id}`); if (activeRef.current === id) setDetail(data); return data; }, []);
@@ -87,17 +87,16 @@ export default function Workspace({ displayName, accountEnabled = false }: { dis
   }, []);
   useEffect(() => {
     if (!selected) return;
-    if (demo && selected === "demo") { setDetail(demoData); setDetailLoading(false); return; }
+    if (demo && selected === "demo") return;
     const controller = new AbortController();
-    setDetail(null); setDetailLoading(true); setError("");
     api<TopicDetail>(`/api/topics/${selected}`, { signal: controller.signal }).then(data => setDetail(data)).catch(e => { if (!controller.signal.aborted) setError(e.message); }).finally(() => { if (!controller.signal.aborted) setDetailLoading(false); });
     return () => controller.abort();
   }, [selected, demo]);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(""), 4500); return () => clearTimeout(id); }, [toast]);
 
   function home(next: "topics" | "weekly" | "memory" = "topics") { if (generating) return; setSelected(null); setDetail(null); setPage(next); setDemo(false); setError(""); setMobileNav(false); setSearch(""); }
-  function openTopic(id: string, nextTab: typeof tab = "summary") { if (generating) return; setDemo(false); setSelected(id); setTab(nextTab); setHistoryId(""); setOriginalSearch(""); setSourceFilter("全部"); setMobileNav(false); }
-  function showDemo() { setDemo(true); setSelected("demo"); setDetail(demoData); setTab("summary"); setHistoryId(""); setMobileNav(false); }
+  function openTopic(id: string, nextTab: typeof tab = "summary") { if (generating) return; if (selected !== id || demo) { setDetail(null); setDetailLoading(true); setError(""); } setDemo(false); setSelected(id); setTab(nextTab); setHistoryId(""); setOriginalSearch(""); setSourceFilter("全部"); setMobileNav(false); }
+  function showDemo() { setDemo(true); setSelected("demo"); setDetail(demoData); setDetailLoading(false); setTab("summary"); setHistoryId(""); setMobileNav(false); }
   function showModal(name: ModalName) { setFormError(""); setModal(name); }
 
   async function createTopic(e: FormEvent) {

@@ -39,6 +39,7 @@ export const POST = api(async (request: Request) => {
   const source = await db.prepare("SELECT id FROM conversations WHERE topic_id = ? AND content_hash = ?").bind(topicId,hash).first<{id:string}>();
   if (!source) throw new ApiError("保存失败，请重试。", 409);
   const saved = await saveAcceptedMemories(db, ownerId, [{ draft: { ...parsed.data, quote: parsed.data.statement, occurredAt: null, occurredPrecision: "unknown", basis: "stated" }, conversationId: source.id, start: 3, end: 3 + parsed.data.statement.length, role: "user", confidence: "low" }]);
+  if (!saved.touched.length) throw new ApiError("保存期间原文已被删除，请刷新后重试。",409);
   await db.prepare("INSERT OR IGNORE INTO memory_extractions(conversation_id,owner_id,extracted_at) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM conversations WHERE id=?)").bind(source.id,ownerId,now,source.id).run();
   return json({ memory: (await listMemories(db, ownerId, {id:saved.touched[0],limit:1}))[0] }, 201);
 });

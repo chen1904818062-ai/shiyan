@@ -2,7 +2,7 @@
 
 <h1 align="center">拾言 · Shiyan</h1>
 <p align="center"><b>把与 AI 的对话和自己的经历，沉淀为可追溯、可更新、可调用的个人记忆。</b></p>
-<p align="center">个人 AI 记忆系统 v1.3.0 · React / TypeScript · Render + Turso</p>
+<p align="center">个人 AI 记忆系统 v1.3.1 候选 · React / TypeScript · Render + Turso</p>
 <p align="center"><a href="#功能一览">功能</a> · <a href="#开始使用">开始使用</a> · <a href="#开发与部署">开发部署</a> · <a href="docs/MEMORY_SYSTEM.md">记忆指南</a> · <a href="CHANGELOG.md">更新记录</a></p>
 
 ## 为什么做拾言
@@ -10,6 +10,8 @@
 和 ChatGPT、豆包、DeepSeek 聊过很多，真正需要时却找不到当时的思路。拾言从保存完整对话开始，让总结回到原文，让记忆经过你的确认，再用于问答、探索计划与复盘。
 
 > 对话是原料，记忆是可以长期积累的资产。
+
+本轮修复与未解决风险见 [对抗式审核报告](docs/ADVERSARIAL_REVIEW.md)；v1.3.1 为待评审候选版本，不表示 Render 已更新。独立记忆地图及手动开通步骤见 [GitHub Pages](docs/GITHUB_PAGES.md)。
 
 ## 功能一览
 
@@ -35,7 +37,7 @@
 
 - **主动导入**：当前通过粘贴保存文本，不会自动连接或读取你的其他 AI 账号。
 - **先确认再调用**：默认只调用已确认的普通记忆；私密、敏感记忆需每次明确允许。所选内容会发送给你配置的模型提供商。
-- **有出处，可核对**：当前用关键词检索，最多发送 24 条记忆及证据；没有向量检索，可能遗漏同义表达。来源检查不能保证模型判断完全正确。
+- **有出处，可核对**：候选版对全库做关键词检索，找不到相关记忆时不调用模型；最多发送 24 条记忆及证据；没有向量检索，可能遗漏同义表达。来源检查不能保证模型判断完全正确。
 - **建议由你落实**：规划不等于已发生的经历；问答和规划结果暂存在当前页面，可导出，刷新后不保留。记忆、原文与修订持久保存。
 - **账号隔离**：当前独立版支持邮箱验证码登录与个人数据空间隔离；手机验证码需另行配置。
 
@@ -70,7 +72,9 @@ npm run build:standalone
 已有自动化检查包括：
 
 ```bash
-node --test tests/memory.test.mjs tests/memory-system.test.mjs tests/standalone.test.mjs tests/accounts.test.mjs tests/model-config.test.mjs tests/model-catalog.test.mjs tests/summary.test.mjs
+npm run check:types
+npm run check:app
+npm test
 ```
 
 ## 反馈与交流

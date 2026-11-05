@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { api, body, context, json, ApiError } from "@/lib/server";
 import { memoryKinds, sensitivityLevels } from "@/lib/memory/taxonomy";
-import { statementKey } from "@/lib/memory/merge";
+import { memoryIdentityKey } from "@/lib/memory/merge";
 import { listMemories } from "@/lib/memory/repo";
 
 type Params = { params: Promise<{ id: string }> };
@@ -20,7 +20,7 @@ const patchSchema = z.discriminatedUnion("action", [
   }).strict(),
 ]);
 
-type CurrentRow = { id: string; kind: string; statement: string; detail: string; status: string; confidence: string; sensitivity: string; updatedAt: string };
+type CurrentRow = { id: string; kind: string; statement: string; detail: string; status: string; confidence: string; sensitivity: string; updatedAt: string; occurredAt: string|null; sourceRole: string };
 
 export const GET = api(async (_request: Request, route: Params) => {
   const {db,ownerId} = await context(); const {id} = await route.params;
@@ -35,7 +35,7 @@ export const PATCH = api(async (request: Request, route: Params) => {
   const { id } = await route.params;
   const parsed = patchSchema.safeParse(await body(request));
   if (!parsed.success) throw new ApiError("提交的修改内容不正确。");
-  const current = await db.prepare("SELECT id, kind, statement, detail, status, confidence, sensitivity, updated_at AS updatedAt FROM memories WHERE id = ? AND owner_id = ?")
+  const current = await db.prepare("SELECT id, kind, statement, detail, status, confidence, sensitivity, updated_at AS updatedAt, occurred_at AS occurredAt, source_role AS sourceRole FROM memories WHERE id = ? AND owner_id = ?")
     .bind(id, ownerId).first<CurrentRow>();
   if (!current) throw new ApiError("没有找到这条记忆。", 404);
 
@@ -64,7 +64,7 @@ export const PATCH = api(async (request: Request, route: Params) => {
   try {
     const results = await db.batch([
       db.prepare("UPDATE memories SET kind = ?, statement = ?, statement_key = ?, detail = ?, status = ?, confidence = ?, sensitivity = ?, updated_at = ? WHERE id = ? AND owner_id = ? AND updated_at = ? AND status = ? AND statement = ?")
-        .bind(kind, statement, statementKey(statement), detail, status, confidence, sensitivity, now, id, ownerId, current.updatedAt, current.status, current.statement),
+        .bind(kind, statement, memoryIdentityKey(statement,current.occurredAt,current.sourceRole), detail, status, confidence, sensitivity, now, id, ownerId, current.updatedAt, current.status, current.statement),
       db.prepare("INSERT INTO memory_revisions (id, memory_id, before_json, after_json, reason, created_at) SELECT ?, ?, ?, ?, ?, ? WHERE changes() > 0")
         .bind(crypto.randomUUID(), id, JSON.stringify(current), JSON.stringify(after), reason, now),
     ]);

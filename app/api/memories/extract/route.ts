@@ -1,5 +1,7 @@
+import { modelApi } from "@/lib/model-operation";
+import { upstreamJson } from "@/lib/upstream-json";
 import { z } from "zod";
-import { api, body, context, json, runtime, ApiError } from "@/lib/server";
+import { body, context, json, runtime, ApiError } from "@/lib/server";
 import { providerIds } from "@/lib/providers";
 import { resolveModelConfig, buildModelRequest, ModelConfigurationError } from "@/lib/model-config";
 import { MEMORY_INPUT_LIMIT, MEMORY_SYSTEM, memoryInput, stripJsonFence } from "@/lib/memory/extract";
@@ -24,7 +26,7 @@ function upstreamMessage(status: number) {
   return "模型暂时无法完成记忆提炼，请稍后重试。";
 }
 
-export const POST = api(async (request: Request) => {
+export const POST = modelApi(async (request: Request) => {
   const { db, ownerId } = await context();
   const parsed = z.object({
     conversationId: z.string().min(1).max(100).optional(),
@@ -80,7 +82,7 @@ export const POST = api(async (request: Request) => {
     }
     let drafts: unknown;
     try {
-      const completion = await upstream.json() as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
+      const completion = await upstreamJson(upstream) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
       if (completion.choices?.[0]?.finish_reason === "length") throw new Error();
       const text = completion.choices?.[0]?.message?.content;
       if (!text) throw new Error();

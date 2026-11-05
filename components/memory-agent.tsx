@@ -7,7 +7,7 @@ import type { ModelInfo } from "@/lib/types";
 import { modelIdentityText } from "@/lib/model-response";
 import { kindLabel } from "@/lib/memory/taxonomy";
 
-type Answer = { result: RecallResponse; memories: MemoryRecord[]; matched: boolean; eligible: number; scanLimit: number; modelInfo: ModelInfo };
+type Answer = { result: RecallResponse; memories: MemoryRecord[]; matched: boolean; eligible: number; modelInfo: ModelInfo };
 export default function MemoryAgent({ mode, canExtract, modelPayload, onOpenSettings, notify }: {mode:"recall"|"plan";canExtract:boolean;modelPayload:Record<string,string>;onOpenSettings:()=>void;notify:(text:string)=>void}) {
   const [question,setQuestion] = useState("");
   const [answeredQuestion,setAnsweredQuestion] = useState("");
@@ -24,11 +24,12 @@ export default function MemoryAgent({ mode, canExtract, modelPayload, onOpenSett
   async function ask(event: React.FormEvent) {
     event.preventDefault(); if(lock.current)return;
     if(!canExtract){onOpenSettings();return;}
-    lock.current=true;setBusy(true);setError("");setAnswer(null);setOriginal("");setFeedback("");
+    const permitted = includePrivate;
+    lock.current=true;setBusy(true);setError("");setAnswer(null);setOriginal("");setFeedback("");setIncludePrivate(false);
     const abort=new AbortController();controller.current=abort;
     const timeout=setTimeout(()=>abort.abort(),165_000);
     try {
-      const response=await fetch("/api/memories/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question,mode,includePrivate,...modelPayload}),signal:abort.signal});
+      const response=await fetch("/api/memories/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question,mode,includePrivate:permitted,...modelPayload}),signal:abort.signal});
       const data=await response.json() as Answer & {error?:string}; if(!response.ok)throw new Error(data.error||"暂时无法回答。"); setAnswer(data);setAnsweredQuestion(question);
     }catch(e){setError(abort.signal.aborted?"等待较久，请稍后重试。":(e as Error).message);}
     finally{clearTimeout(timeout);setBusy(false);lock.current=false;}
@@ -57,7 +58,7 @@ export default function MemoryAgent({ mode, canExtract, modelPayload, onOpenSett
     <form onSubmit={ask}>
       <label className="memory-field">{mode==="plan"?"你的目标与现实限制":"想从记忆中了解什么？"}<textarea value={question} onChange={e=>setQuestion(e.target.value)} minLength={2} maxLength={2000} required disabled={busy} placeholder="例如：我目前有哪些项目经历，下一步还需要验证什么？" /></label>
       <label className="memory-permission"><input type="checkbox" checked={includePrivate} onChange={e=>{setIncludePrivate(e.target.checked);setAnswer(null);}} disabled={busy}/>允许本次使用私密和敏感记忆</label>
-      <p className="memory-hint">默认仅使用已确认的普通记忆。按关键词从最近500条已确认记忆中检索，最多发送24条及其证据到你配置的模型；不会发送密钥到其他平台。回答暂存在当前页面，离开后可重新提问或提前导出。</p>
+      <p className="memory-hint">在全部已确认且获准使用的记忆中按关键词检索，最多发送24条及证据到所选模型。找不到相关记忆时不会调用模型。私密授权仅对本次提交有效；关键词检索可能遗漏同义表达。回答暂存在当前页面，可提前导出。</p>
       <button className="button primary" type="submit" disabled={busy||question.trim().length<2}>{busy?<LoaderCircle className="spin" size={15}/>:<Send size={15}/>} {busy?"正在调用记忆…":!canExtract?"配置模型后继续":mode==="plan"?"生成探索计划":"查找记忆并回答"}</button>
     </form>
     {error&&<p className="memory-error" role="alert">{error}</p>}

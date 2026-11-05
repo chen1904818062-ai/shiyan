@@ -30,7 +30,8 @@ export const providers: Record<ProviderId, Provider> = {
   },
 };
 
-export function defaultChoice(provider: ProviderId): ModelChoice {
+export function defaultChoice(_provider: ProviderId): ModelChoice {
+  void _provider;
   return { apiKey: "", model: "" };
 }
 
