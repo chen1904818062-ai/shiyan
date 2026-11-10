@@ -1,9 +1,13 @@
 <p align="center"><img src="docs/assets/banner.svg" alt="拾言 · 个人 AI 记忆系统" width="100%"></p>
 
+<p align="center">简体中文 · <a href="README.en.md">English</a> · <a href="docs/QUICK_TOUR.md">5 分钟体验指南</a></p>
+
 <h1 align="center">拾言 · Shiyan</h1>
 <p align="center"><b>把与 AI 的对话和自己的经历，沉淀为可追溯、可更新、可调用的个人记忆。</b></p>
 <p align="center">个人 AI 记忆系统 v1.3.0 · React / TypeScript · Render + Turso</p>
 <p align="center"><a href="#功能一览">功能</a> · <a href="#开始使用">开始使用</a> · <a href="#开发与部署">开发部署</a> · <a href="docs/MEMORY_SYSTEM.md">记忆指南</a> · <a href="CHANGELOG.md">更新记录</a></p>
+
+**[在线体验](https://shiyan-beta.onrender.com/)** · 邮箱验证码登录；AI 提炼和问答需配置自己的模型密钥。
 
 ## 为什么做拾言
 
@@ -74,6 +78,8 @@ node --test tests/memory.test.mjs tests/memory-system.test.mjs tests/standalone.
 ```
 
 ## 反馈与交流
+
+如果你也需要把 AI 对话变为可追溯的个人记忆，欢迎 **[Star 关注项目](https://github.com/chen1904818062-ai/shiyan)**，并按 [5 分钟体验指南](docs/QUICK_TOUR.md) 留下一条具体反馈。
 
 欢迎通过 [Issues](https://github.com/chen1904818062-ai/shiyan/issues) 反馈使用问题和改进建议。提交问题时请移除私人对话、验证码和 API Key。
 
